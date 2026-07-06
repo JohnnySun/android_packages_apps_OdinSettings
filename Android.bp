@@ -1,0 +1,9 @@
+android_app {
+    name: "OdinSettings",
+    srcs: ["src/**/*.java"],
+    resource_dirs: ["res"],
+    certificate: "platform",
+    privileged: true,
+    platform_apis: true,
+    manifest: "AndroidManifest.xml",
+}
