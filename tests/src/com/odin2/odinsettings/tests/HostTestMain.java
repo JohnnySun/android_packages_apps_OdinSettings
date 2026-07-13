@@ -23,6 +23,7 @@ public final class HostTestMain {
         standardProfileIsIdentity();
         flippedProfileSwapsOnlyFaceButtons();
         unknownStoredProfileFallsBackToStandard();
+        identityPolicyAcceptsOnlyProvenDeviceProductPairs();
         unknownDeviceNeverReachesAdapter();
         recognizedDeviceStillFailsClosedWithoutAdapter();
         capabilityGatePreventsUnsupportedCalls();
@@ -59,6 +60,30 @@ public final class HostTestMain {
         assertEquals(ControllerProfiles.STANDARD,
                 ControllerProfiles.findOrDefault("corrupt-or-future-value"),
                 "unknown preview profile fallback");
+        pass();
+    }
+
+    private static void identityPolicyAcceptsOnlyProvenDeviceProductPairs() {
+        HardwareAccessPolicy policy = new HardwareAccessPolicy();
+
+        assertTrue(policy.evaluate(
+                new DeviceIdentity("Odin2_Mini", "kalama", "kalama", "QCS8550"))
+                .allowed, "stock identity is accepted");
+        assertTrue(policy.evaluate(
+                new DeviceIdentity(
+                        "Odin2 Mini", "odin2_mini", "lineage_odin2_mini", "QCS8550"))
+                .allowed, "Lineage identity is accepted");
+        assertFalse(policy.evaluate(
+                new DeviceIdentity(
+                        "Odin2 Mini", "odin2_mini", "kalama", "QCS8550"))
+                .allowed, "mixed Lineage device and stock product are rejected");
+        assertFalse(policy.evaluate(
+                new DeviceIdentity(
+                        "Odin2 Mini", "kalama", "lineage_odin2_mini", "QCS8550"))
+                .allowed, "mixed stock device and Lineage product are rejected");
+        assertFalse(policy.evaluate(
+                new DeviceIdentity("Odin2 Mini", "unknown", "unknown", "QCS8550"))
+                .allowed, "unknown device and product are rejected");
         pass();
     }
 
@@ -153,6 +178,12 @@ public final class HostTestMain {
 
     private static void assertFalse(boolean value, String message) {
         if (value) {
+            throw new AssertionError(message);
+        }
+    }
+
+    private static void assertTrue(boolean value, String message) {
+        if (!value) {
             throw new AssertionError(message);
         }
     }

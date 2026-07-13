@@ -7,7 +7,11 @@ public final class HardwareAccessPolicy {
         if (!recognizedModel) {
             return AccessDecision.deny("Unrecognized model");
         }
-        if (!"kalama".equals(identity.device) || !"kalama".equals(identity.product)) {
+        boolean stockIdentity = "kalama".equals(identity.device)
+                && "kalama".equals(identity.product);
+        boolean lineageIdentity = "odin2_mini".equals(identity.device)
+                && "lineage_odin2_mini".equals(identity.product);
+        if (!stockIdentity && !lineageIdentity) {
             return AccessDecision.deny("Unexpected device or product identity");
         }
         if (!"QCS8550".equalsIgnoreCase(identity.socModel)) {
