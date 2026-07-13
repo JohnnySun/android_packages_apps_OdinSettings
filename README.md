@@ -14,6 +14,12 @@ Initial stock parity targets:
 - `com.android.settings.action.EXTRA_SETTINGS` activity entry.
 - Keep-screen-on quick settings tile.
 - Force-landscape quick settings tile.
-- Links or surfaces for touch mapping and game assistant behavior.
+- Read-only rows for `fan_mode`, `performance_mode`, `touch_mapping`, and
+  `game_assistant`.
+- Visible mapping status, candidate read paths, and LineageOS 24 action text
+  generated from the workbench bring-up matrix.
+
+Reference matrix:
+`docs/ports/odin-settings/bringup-readiness.md` in the `odin2-mini` workbench.
 
 Workbench: `JohnnySun/odin2-mini`
