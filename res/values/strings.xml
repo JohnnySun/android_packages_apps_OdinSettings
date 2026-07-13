@@ -3,4 +3,6 @@
     <string name="tile_keep_screen_on">Keep screen on</string>
     <string name="tile_force_landscape">Force landscape</string>
     <string name="bringup_summary">Device controls are disabled until stock control paths are validated.</string>
+    <string name="control_list_title">Device controls</string>
+    <string name="control_disabled_summary">Read-only bring-up mode. No hardware writes are enabled.</string>
 </resources>
