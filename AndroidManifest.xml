@@ -22,7 +22,8 @@
         <activity
             android:name=".ControllerTestActivity"
             android:exported="false"
-            android:label="@string/controller_test_title" />
+            android:label="@string/controller_test_title"
+            android:parentActivityName=".MainSettingsActivity" />
 
         <service
             android:name=".tiles.KeepScreenOnTileService"
