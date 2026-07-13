@@ -7,6 +7,7 @@
     <string name="control_disabled_summary">只读开发模式，尚未启用任何硬件写入。</string>
     <string name="controller_category">手柄</string>
     <string name="preview_profile_title">输入预览布局</string>
+    <string name="preview_profile_summary">%1$s</string>
     <string name="controller_test_title">手柄输入测试</string>
     <string name="controller_test_summary">使用选定的预览布局检查实体按键</string>
     <string name="controller_test_prompt">按下手柄按键</string>

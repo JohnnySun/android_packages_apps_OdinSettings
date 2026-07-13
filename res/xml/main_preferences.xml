@@ -6,7 +6,7 @@
             android:entries="@array/controller_profile_entries"
             android:entryValues="@array/controller_profile_values"
             android:key="preview_controller_profile"
-            android:summary="%s"
+            android:summary="@string/preview_profile_summary"
             android:title="@string/preview_profile_title" />
         <Preference
             android:key="controller_input_test"
