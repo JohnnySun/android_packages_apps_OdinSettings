@@ -18,6 +18,7 @@ import org.xml.sax.SAXException;
 final class ResourceContractTest {
     static void verify() {
         Path repo = Path.of(requiredProperty("odin.repo_dir"));
+        UiResourceContractTest.verify(repo);
         assertSettingsTheme(repo.resolve("res/values/styles.xml"));
         assertLocaleMatches(repo, "values-zh-rTW");
         assertLocaleMatches(repo, "values-zh-rCN");

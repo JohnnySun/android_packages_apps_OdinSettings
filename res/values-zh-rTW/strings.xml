@@ -7,6 +7,7 @@
     <string name="control_disabled_summary">唯讀開發模式，尚未啟用任何硬體寫入。</string>
     <string name="controller_category">手柄</string>
     <string name="preview_profile_title">輸入預覽配置</string>
+    <string name="preview_profile_summary">%1$s</string>
     <string name="controller_test_title">手柄輸入測試</string>
     <string name="controller_test_summary">使用選定的預覽配置檢查實體按鍵</string>
     <string name="controller_test_prompt">按下手柄按鍵</string>

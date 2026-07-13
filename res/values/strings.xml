@@ -7,6 +7,7 @@
     <string name="control_disabled_summary">Read-only bring-up mode. No hardware writes are enabled.</string>
     <string name="controller_category">Controller</string>
     <string name="preview_profile_title">Input preview layout</string>
+    <string name="preview_profile_summary">%1$s</string>
     <string name="controller_test_title">Controller input test</string>
     <string name="controller_test_summary">Inspect physical buttons with the selected preview layout</string>
     <string name="controller_test_prompt">Press a controller button</string>

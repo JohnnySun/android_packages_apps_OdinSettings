@@ -1,7 +1,7 @@
 <resources>
     <string-array name="controller_profile_entries">
-        <item>標準（Xbox 配置）</item>
-        <item>對調主要按鍵</item>
+        <item>@string/controller_profile_standard</item>
+        <item>@string/controller_profile_flipped_face</item>
     </string-array>
     <string-array name="controller_profile_values">
         <item>standard</item>
