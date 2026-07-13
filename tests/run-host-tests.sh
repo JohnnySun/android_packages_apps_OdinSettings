@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "$0")/.." && pwd)
+source_root=$(cd "$repo_dir/../../.." && pwd)
 homebrew=${HOMEBREW_PREFIX:-/opt/homebrew}
 jdk_home=${JAVA_HOME:-}
 javac_cmd=
@@ -9,6 +10,19 @@ java_cmd=
 
 if [[ -z "$jdk_home" && -x "$homebrew/bin/brew" ]]; then
   jdk_home="$($homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+fi
+
+host_tag=
+case "$(uname -s):$(uname -m)" in
+  Linux:x86_64) host_tag=linux-x86 ;;
+  Darwin:arm64) host_tag=darwin-arm64 ;;
+  Darwin:x86_64) host_tag=darwin-x86 ;;
+esac
+if [[ -z "$jdk_home" && -n "$host_tag" ]]; then
+  source_jdk="$source_root/prebuilts/jdk/jdk21/$host_tag"
+  if [[ -x "$source_jdk/bin/javac" && -x "$source_jdk/bin/java" ]]; then
+    jdk_home="$source_jdk"
+  fi
 fi
 
 if [[ -n "$jdk_home" && -x "$jdk_home/bin/javac" && -x "$jdk_home/bin/java" ]]; then
