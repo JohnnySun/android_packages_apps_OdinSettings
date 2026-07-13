@@ -1,6 +1,6 @@
 # android_packages_apps_OdinSettings
 
-Odin Settings replacement app seed for AYN Odin2 Mini.
+Maintainable Odin Settings replacement for AYN Odin2 Mini.
 
 Source tree path: `packages/apps/OdinSettings`
 
@@ -9,17 +9,29 @@ Settings entry point can match the stock user journey. Hardware writes must stay
 fail-closed until the workbench records a validated control path from stock
 firmware.
 
-Initial stock parity targets:
+The Android 16 increment currently provides:
 
 - `com.android.settings.action.EXTRA_SETTINGS` activity entry.
-- Keep-screen-on quick settings tile.
-- Force-landscape quick settings tile.
-- Read-only rows for `fan_mode`, `performance_mode`, `touch_mapping`, and
-  `game_assistant`.
-- Visible mapping status, candidate read paths, and LineageOS 24 action text
-  generated from the workbench bring-up matrix.
+- Immutable standard and flipped face-button controller profiles.
+- A local controller input tester that previews the selected profile without
+  injecting events or changing the system mapping.
+- A policy and privileged-adapter boundary that denies unknown devices and
+  remains unavailable even on recognized Odin hardware.
+- Read-only external-display and hardware-control status.
+- Fail-closed keep-screen-on and force-landscape quick settings tiles.
 
-Reference matrix:
-`docs/ports/odin-settings/bringup-readiness.md` in the `odin2-mini` workbench.
+Stock behavior and safety evidence is summarized in
+`docs/stock-control-matrix.md`. No proprietary APK, native library, resource, or
+decompiled implementation is part of this repository.
+
+System-wide event injection, touch overlays, fan control, MCU access, joystick
+calibration, HDMI node writes, firmware updates, root, and OTA behavior remain
+disabled until each path has dedicated evidence and review.
 
 Workbench: `JohnnySun/odin2-mini`
+
+Run the local host checks with:
+
+```bash
+./tests/run-host-tests.sh
+```

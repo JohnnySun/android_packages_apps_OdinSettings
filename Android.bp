@@ -7,3 +7,18 @@ android_app {
     platform_apis: true,
     manifest: "AndroidManifest.xml",
 }
+
+java_test_host {
+    name: "OdinSettingsHostTests",
+    srcs: [
+        "src/com/odin2/odinsettings/domain/**/*.java",
+        "src/com/odin2/odinsettings/display/**/*.java",
+        "src/com/odin2/odinsettings/hardware/**/*.java",
+        "src/com/odin2/odinsettings/policy/**/*.java",
+        "src/com/odin2/odinsettings/service/**/*.java",
+        "tests/src/**/*.java",
+    ],
+    test_options: {
+        unit_test: true,
+    },
+}

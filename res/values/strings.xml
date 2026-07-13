@@ -5,4 +5,25 @@
     <string name="bringup_summary">Device controls are disabled until stock control paths are validated.</string>
     <string name="control_list_title">Device controls</string>
     <string name="control_disabled_summary">Read-only bring-up mode. No hardware writes are enabled.</string>
+    <string name="controller_category">Controller</string>
+    <string name="preview_profile_title">Input preview layout</string>
+    <string name="controller_test_title">Controller input test</string>
+    <string name="controller_test_summary">Inspect physical buttons with the selected preview layout</string>
+    <string name="controller_test_prompt">Press a controller button</string>
+    <string name="preview_profile_label">Preview layout</string>
+    <string name="physical_button_label">Physical input</string>
+    <string name="preview_output_label">Mapped preview</string>
+    <string name="no_button_detected">No button detected</string>
+    <string name="system_mapping_title">System-wide controller mapping</string>
+    <string name="system_mapping_unavailable_summary">Unavailable until the privileged input adapter is validated.</string>
+    <string name="unrecognized_device_summary">Unavailable on unrecognized hardware.</string>
+    <string name="external_display_category">External display</string>
+    <string name="external_display_policy_title">External display policy</string>
+    <string name="external_display_available_summary">External display adapter available.</string>
+    <string name="external_display_unavailable_summary">Unavailable until Android 16 display behavior is validated.</string>
+    <string name="hardware_controls_category">Hardware controls</string>
+    <string name="fan_control_title">Fan control</string>
+    <string name="fan_control_summary">Unavailable until the thermal control path is validated.</string>
+    <string name="calibration_title">Joystick calibration</string>
+    <string name="calibration_summary">Unavailable until calibration storage and restore behavior are validated.</string>
 </resources>
