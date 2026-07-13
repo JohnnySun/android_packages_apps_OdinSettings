@@ -32,4 +32,7 @@ done < <(
 )
 
 "$jdk_home/bin/javac" -Xlint:all -Werror -d "$classes_dir" "${sources[@]}"
-"$jdk_home/bin/java" -cp "$classes_dir" com.odin2.odinsettings.tests.HostTestMain
+"$jdk_home/bin/java" \
+  -Dodin.repo_dir="$repo_dir" \
+  -cp "$classes_dir" \
+  com.odin2.odinsettings.tests.HostTestMain

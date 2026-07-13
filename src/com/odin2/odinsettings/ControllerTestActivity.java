@@ -10,6 +10,7 @@ import android.widget.TextView;
 import com.odin2.odinsettings.domain.ControllerButton;
 import com.odin2.odinsettings.domain.ControllerProfile;
 import com.odin2.odinsettings.platform.AndroidControllerInputMapper;
+import com.odin2.odinsettings.platform.ControllerDisplayNames;
 import com.odin2.odinsettings.platform.ControllerProfileStore;
 
 public final class ControllerTestActivity extends Activity {
@@ -53,7 +54,7 @@ public final class ControllerTestActivity extends Activity {
     protected void onResume() {
         super.onResume();
         profile = ControllerProfileStore.read(this);
-        profileValue.setText(profile.displayName);
+        profileValue.setText(ControllerDisplayNames.profileName(profile));
         physicalValue.setText(R.string.no_button_detected);
         mappedValue.setText(R.string.no_button_detected);
     }
@@ -71,8 +72,8 @@ public final class ControllerTestActivity extends Activity {
             return super.dispatchKeyEvent(event);
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            physicalValue.setText(physical.displayName);
-            mappedValue.setText(profile.map(physical).displayName);
+            physicalValue.setText(ControllerDisplayNames.buttonName(physical));
+            mappedValue.setText(ControllerDisplayNames.buttonName(profile.map(physical)));
         }
         return true;
     }
