@@ -29,6 +29,8 @@ public final class HostTestMain {
         capabilityGatePreventsUnsupportedCalls();
         reviewedAdapterCanReceiveRecognizedProfile();
         externalDisplayUsesTheSameIdentityAndCapabilityGates();
+        ResourceContractTest.verify();
+        pass();
 
         System.out.println("PASS: " + tests + " Odin Settings host tests");
     }
