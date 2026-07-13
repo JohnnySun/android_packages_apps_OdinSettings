@@ -19,6 +19,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ControllerTestActivity"
+            android:exported="false"
+            android:label="@string/controller_test_title" />
+
         <service
             android:name=".tiles.KeepScreenOnTileService"
             android:exported="true"

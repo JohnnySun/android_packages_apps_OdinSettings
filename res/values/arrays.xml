@@ -1,0 +1,10 @@
+<resources>
+    <string-array name="controller_profile_entries">
+        <item>Standard (Xbox-style)</item>
+        <item>Flipped face buttons</item>
+    </string-array>
+    <string-array name="controller_profile_values">
+        <item>standard</item>
+        <item>flipped_face</item>
+    </string-array>
+</resources>

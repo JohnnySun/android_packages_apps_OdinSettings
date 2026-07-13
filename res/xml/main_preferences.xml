@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory android:title="@string/controller_category">
+        <ListPreference
+            android:defaultValue="standard"
+            android:entries="@array/controller_profile_entries"
+            android:entryValues="@array/controller_profile_values"
+            android:key="preview_controller_profile"
+            android:summary="%s"
+            android:title="@string/preview_profile_title" />
+        <Preference
+            android:key="controller_input_test"
+            android:summary="@string/controller_test_summary"
+            android:title="@string/controller_test_title" />
+        <Preference
+            android:enabled="false"
+            android:key="system_controller_mapping"
+            android:title="@string/system_mapping_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/external_display_category">
+        <Preference
+            android:enabled="false"
+            android:key="external_display_policy"
+            android:title="@string/external_display_policy_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/hardware_controls_category">
+        <Preference
+            android:enabled="false"
+            android:summary="@string/fan_control_summary"
+            android:title="@string/fan_control_title" />
+        <Preference
+            android:enabled="false"
+            android:summary="@string/calibration_summary"
+            android:title="@string/calibration_title" />
+    </PreferenceCategory>
+</PreferenceScreen>
