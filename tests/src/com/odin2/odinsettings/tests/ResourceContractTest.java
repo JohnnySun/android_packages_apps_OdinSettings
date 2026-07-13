@@ -23,6 +23,7 @@ final class ResourceContractTest {
         assertLocaleMatches(repo, "values-zh-rCN");
         assertControllerLabelsAreLocalized(repo.resolve(
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
+        assertHandheldActivityLayout(repo);
     }
 
     private static void assertSettingsTheme(Path stylesPath) {
@@ -69,6 +70,40 @@ final class ResourceContractTest {
                 "controller UI must use localized resources, not domain displayName fields");
         assertTrue(source.contains("ControllerDisplayNames"),
                 "controller UI must use the Android resource mapper");
+    }
+
+    private static void assertHandheldActivityLayout(Path repo) {
+        String mainActivity = read(repo.resolve(
+                "src/com/odin2/odinsettings/MainSettingsActivity.java"));
+        assertTrue(mainActivity.contains("boolean onIsMultiPane()"),
+                "main settings must define its handheld pane policy");
+        assertTrue(mainActivity.contains("return false;"),
+                "main settings must not leave half the landscape display empty");
+        assertTrue(mainActivity.contains("ControllerNavigation.translateConfirm"),
+                "main settings must translate gamepad A into a UI confirm action");
+        assertTrue(mainActivity.contains("ControllerNavigation.isBack"),
+                "main settings must handle gamepad B as back");
+        assertTrue(mainActivity.contains("focusFirstEnabledPreference"),
+                "main settings must expose an initial D-pad focus target");
+
+        String controllerTest = read(repo.resolve(
+                "src/com/odin2/odinsettings/ControllerTestActivity.java"));
+        assertTrue(controllerTest.contains("setDisplayHomeAsUpEnabled(true)"),
+                "controller test must provide visible up navigation");
+        assertTrue(controllerTest.contains("android.R.id.home"),
+                "controller test must handle the up affordance");
+        assertTrue(controllerTest.contains("ControllerNavigation.isBack"),
+                "controller test must remain escapable with gamepad B");
+
+        String preferences = read(repo.resolve("res/xml/main_preferences.xml"));
+        assertTrue(preferences.contains("ControllerListPreference"),
+                "profile chooser must use the controller-aware dialog preference");
+        String listPreference = read(repo.resolve(
+                "src/com/odin2/odinsettings/widget/ControllerListPreference.java"));
+        assertTrue(listPreference.contains("setOnKeyListener"),
+                "profile dialog must receive controller navigation events");
+        assertTrue(listPreference.contains("performItemClick"),
+                "profile dialog must activate its focused row with gamepad A");
     }
 
     private static Document parse(Path path) {

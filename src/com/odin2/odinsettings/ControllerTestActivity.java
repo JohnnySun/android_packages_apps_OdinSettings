@@ -1,9 +1,11 @@
 package com.odin2.odinsettings;
 
 import android.app.Activity;
+import android.app.ActionBar;
 import android.os.Bundle;
 import android.view.InputDevice;
 import android.view.KeyEvent;
+import android.view.MenuItem;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -11,6 +13,7 @@ import com.odin2.odinsettings.domain.ControllerButton;
 import com.odin2.odinsettings.domain.ControllerProfile;
 import com.odin2.odinsettings.platform.AndroidControllerInputMapper;
 import com.odin2.odinsettings.platform.ControllerDisplayNames;
+import com.odin2.odinsettings.platform.ControllerNavigation;
 import com.odin2.odinsettings.platform.ControllerProfileStore;
 
 public final class ControllerTestActivity extends Activity {
@@ -22,6 +25,11 @@ public final class ControllerTestActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        ActionBar actionBar = getActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -61,6 +69,12 @@ public final class ControllerTestActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (ControllerNavigation.isBack(event)) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                finish();
+            }
+            return true;
+        }
         boolean controllerSource = event.isFromSource(InputDevice.SOURCE_GAMEPAD)
                 || event.isFromSource(InputDevice.SOURCE_JOYSTICK)
                 || event.isFromSource(InputDevice.SOURCE_DPAD);
@@ -76,6 +90,15 @@ public final class ControllerTestActivity extends Activity {
             mappedValue.setText(ControllerDisplayNames.buttonName(profile.map(physical)));
         }
         return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private TextView label(String value) {
