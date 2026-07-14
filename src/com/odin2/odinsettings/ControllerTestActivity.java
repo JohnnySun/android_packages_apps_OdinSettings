@@ -122,8 +122,9 @@ public final class ControllerTestActivity extends Activity {
             return super.dispatchKeyEvent(event);
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-            String physicalName = ControllerDisplayNames.buttonName(physical);
-            String mappedName = ControllerDisplayNames.buttonName(profile.map(physical));
+            String physicalName = getString(ControllerDisplayNames.buttonName(physical));
+            String mappedName = getString(
+                    ControllerDisplayNames.buttonName(profile.map(physical)));
             physicalValue.setText(physicalName);
             mappedValue.setText(mappedName);
             String announcement = getString(

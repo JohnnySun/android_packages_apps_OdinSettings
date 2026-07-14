@@ -115,6 +115,9 @@ final class ResourceContractTest {
                 "controller test status labels must identify their dynamic values");
         assertTrue(controllerTest.contains("ACCESSIBILITY_LIVE_REGION_POLITE"),
                 "controller test results must be exposed as accessibility live regions");
+        assertTrue(controllerTest.contains(
+                        "getString(ControllerDisplayNames.buttonName(physical))"),
+                "controller test must resolve button resource IDs through the activity locale");
 
         String preferences = read(repo.resolve("res/xml/main_preferences.xml"));
         assertTrue(preferences.contains("ControllerListPreference"),
