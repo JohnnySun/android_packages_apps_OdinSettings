@@ -15,6 +15,8 @@
     <string name="physical_button_label">实体输入</string>
     <string name="preview_output_label">映射预览</string>
     <string name="no_button_detected">未检测到按键</string>
+    <string name="controller_test_result_announcement">实体输入 %1$s，映射预览 %2$s。</string>
+    <string name="done">完成</string>
     <string name="system_mapping_title">全系统手柄映射</string>
     <string name="system_mapping_unavailable_summary">完成特权输入适配器验证后才可使用。</string>
     <string name="unrecognized_device_summary">无法在未识别的硬件上使用。</string>

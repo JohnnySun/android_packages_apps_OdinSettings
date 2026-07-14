@@ -15,6 +15,8 @@
     <string name="physical_button_label">實體輸入</string>
     <string name="preview_output_label">映射預覽</string>
     <string name="no_button_detected">未偵測到按鍵</string>
+    <string name="controller_test_result_announcement">實體輸入 %1$s，映射預覽 %2$s。</string>
+    <string name="done">完成</string>
     <string name="system_mapping_title">全系統手柄映射</string>
     <string name="system_mapping_unavailable_summary">完成特權輸入轉接器驗證後才可使用。</string>
     <string name="unrecognized_device_summary">無法在未識別的硬體上使用。</string>

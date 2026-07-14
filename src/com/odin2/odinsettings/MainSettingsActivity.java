@@ -5,6 +5,9 @@ import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 
@@ -16,6 +19,10 @@ import com.odin2.odinsettings.policy.AccessDecision;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 
 public final class MainSettingsActivity extends PreferenceActivity {
+    private ListView preferenceList;
+    private int lastFocusedPosition = ListView.INVALID_POSITION;
+    private boolean controllerFocusActive;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -38,6 +45,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
                 ? getString(R.string.external_display_available_summary)
                 : getString(R.string.external_display_unavailable_summary));
 
+        configureControllerFocus();
         focusFirstEnabledPreference();
     }
 
@@ -54,24 +62,101 @@ public final class MainSettingsActivity extends PreferenceActivity {
             }
             return true;
         }
+        if (ControllerNavigation.isControllerEvent(event)
+                && event.getAction() == KeyEvent.ACTION_DOWN) {
+            activateControllerFocus();
+        }
         return super.dispatchKeyEvent(ControllerNavigation.translateConfirm(event));
     }
 
-    private void focusFirstEnabledPreference() {
-        ListView list = getListView();
-        list.setFocusableInTouchMode(true);
-        list.post(new Runnable() {
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && controllerFocusActive && preferenceList != null) {
+            preferenceList.post(new Runnable() {
+                @Override
+                public void run() {
+                    restoreControllerFocus();
+                }
+            });
+        }
+    }
+
+    private void configureControllerFocus() {
+        preferenceList = getListView();
+        preferenceList.setFocusableInTouchMode(true);
+        preferenceList.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void run() {
-                ListAdapter adapter = list.getAdapter();
-                for (int position = 0; position < adapter.getCount(); position++) {
-                    if (adapter.isEnabled(position)) {
-                        list.requestFocus();
-                        list.setSelection(position);
-                        return;
-                    }
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isEnabledPosition(position)) {
+                    lastFocusedPosition = position;
                 }
             }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
+        preferenceList.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    int position = preferenceList.pointToPosition(
+                            Math.round(event.getX()), Math.round(event.getY()));
+                    if (isEnabledPosition(position)) {
+                        lastFocusedPosition = position;
+                    }
+                    controllerFocusActive = false;
+                }
+                return false;
+            }
+        });
+    }
+
+    private void focusFirstEnabledPreference() {
+        controllerFocusActive = true;
+        preferenceList.post(new Runnable() {
+            @Override
+            public void run() {
+                restoreControllerFocus();
+            }
+        });
+    }
+
+    private void activateControllerFocus() {
+        controllerFocusActive = true;
+        restoreControllerFocus();
+    }
+
+    private void restoreControllerFocus() {
+        int selectedPosition = preferenceList.getSelectedItemPosition();
+        if (isEnabledPosition(selectedPosition)) {
+            lastFocusedPosition = selectedPosition;
+        } else if (!isEnabledPosition(lastFocusedPosition)) {
+            lastFocusedPosition = firstEnabledPosition();
+        }
+        if (lastFocusedPosition == ListView.INVALID_POSITION) {
+            return;
+        }
+        preferenceList.requestFocus();
+        preferenceList.setSelection(lastFocusedPosition);
+    }
+
+    private int firstEnabledPosition() {
+        ListAdapter adapter = preferenceList.getAdapter();
+        if (adapter == null) {
+            return ListView.INVALID_POSITION;
+        }
+        for (int position = 0; position < adapter.getCount(); position++) {
+            if (adapter.isEnabled(position)) {
+                return position;
+            }
+        }
+        return ListView.INVALID_POSITION;
+    }
+
+    private boolean isEnabledPosition(int position) {
+        ListAdapter adapter = preferenceList == null ? null : preferenceList.getAdapter();
+        return adapter != null && position >= 0 && position < adapter.getCount()
+                && adapter.isEnabled(position);
     }
 }
