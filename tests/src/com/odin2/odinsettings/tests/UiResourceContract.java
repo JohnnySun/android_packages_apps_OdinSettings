@@ -27,6 +27,8 @@ import org.xml.sax.SAXException;
 final class UiResourceContract {
     private static final String SETTINGS_THEME =
             "@android:style/Theme.DeviceDefault.Settings";
+    private static final Set<String> SUPPORTED_LOCALES = new HashSet<>(Arrays.asList(
+            "en", "zh-CN", "zh-TW"));
     private static final Set<String> VISIBLE_TEXT_ATTRIBUTES = new HashSet<>(Arrays.asList(
             "contentDescription", "dialogTitle", "hint", "label", "negativeButtonText",
             "neutralButtonText", "positiveButtonText", "summary", "text", "title"));
@@ -81,6 +83,7 @@ final class UiResourceContract {
         inspectLocaleParity(repo.resolve("res"), violations);
         Path manifest = repo.resolve("AndroidManifest.xml");
         inspectApplicationTheme(manifest, violations);
+        inspectLocaleConfig(repo, manifest, violations);
         inspectXmlTree(repo, manifest, violations);
         inspectXmlDirectory(repo, repo.resolve("res"), violations);
         inspectJavaDirectory(repo, repo.resolve("src"), violations);
@@ -135,11 +138,50 @@ final class UiResourceContract {
         }
     }
 
+    private static void inspectLocaleConfig(Path repo, Path manifestPath,
+            List<String> violations) {
+        if (!Files.isRegularFile(manifestPath)) {
+            return;
+        }
+        Document manifest = parse(manifestPath);
+        NodeList applications = manifest.getElementsByTagName("application");
+        if (applications.getLength() != 1) {
+            return;
+        }
+        Element application = (Element) applications.item(0);
+        if (!"@xml/locales_config".equals(application.getAttribute("android:localeConfig"))) {
+            violations.add("locale-config: application must use @xml/locales_config");
+        }
+
+        Path configPath = repo.resolve("res/xml/locales_config.xml");
+        if (!Files.isRegularFile(configPath)) {
+            violations.add("locale-config: missing res/xml/locales_config.xml");
+            return;
+        }
+        Document config = parse(configPath);
+        if (!"locale-config".equals(config.getDocumentElement().getTagName())) {
+            violations.add("locale-config: root element must be locale-config");
+            return;
+        }
+        Set<String> configured = new HashSet<>();
+        NodeList locales = config.getElementsByTagName("locale");
+        for (int index = 0; index < locales.getLength(); index++) {
+            String locale = ((Element) locales.item(index)).getAttribute("android:name");
+            if (!configured.add(locale)) {
+                violations.add("locale-config: duplicate locale " + locale);
+            }
+        }
+        if (!SUPPORTED_LOCALES.equals(configured)) {
+            violations.add("locale-config: expected=" + SUPPORTED_LOCALES
+                    + " configured=" + configured);
+        }
+    }
+
     private static void inspectLocaleParity(Path resDir, List<String> violations) {
-        Map<String, String> english = resourceValues(resDir.resolve("values"));
+        Map<String, String> english = resourceValues(resDir.resolve("values"), true);
         for (String locale : Arrays.asList("values-zh-rCN", "values-zh-rTW")) {
             Path localeDir = resDir.resolve(locale);
-            Map<String, String> localized = resourceValues(localeDir);
+            Map<String, String> localized = resourceValues(localeDir, false);
             if (!english.keySet().equals(localized.keySet())) {
                 Set<String> missing = new HashSet<>(english.keySet());
                 missing.removeAll(localized.keySet());
@@ -153,9 +195,11 @@ final class UiResourceContract {
                 }
             }
         }
+        inspectStableValueArray(resDir.resolve("values/arrays.xml"), violations);
     }
 
-    private static Map<String, String> resourceValues(Path valuesDir) {
+    private static Map<String, String> resourceValues(Path valuesDir,
+            boolean omitNonTranslatable) {
         Map<String, String> resources = new HashMap<>();
         if (!Files.isDirectory(valuesDir)) {
             return resources;
@@ -174,6 +218,10 @@ final class UiResourceContract {
                         && !"plurals".equals(tag)) {
                     continue;
                 }
+                if (omitNonTranslatable
+                        && "false".equals(element.getAttribute("translatable"))) {
+                    continue;
+                }
                 String key = tag + "/" + element.getAttribute("name");
                 String previous = resources.put(key, element.getTextContent());
                 if (previous != null) {
@@ -186,6 +234,26 @@ final class UiResourceContract {
             }
         }
         return resources;
+    }
+
+    private static void inspectStableValueArray(Path arraysPath, List<String> violations) {
+        if (!Files.isRegularFile(arraysPath)) {
+            violations.add("locale-drift: missing " + arraysPath);
+            return;
+        }
+        Document document = parse(arraysPath);
+        NodeList arrays = document.getElementsByTagName("string-array");
+        for (int index = 0; index < arrays.getLength(); index++) {
+            Element array = (Element) arrays.item(index);
+            if (!"controller_profile_values".equals(array.getAttribute("name"))) {
+                continue;
+            }
+            if (!"false".equals(array.getAttribute("translatable"))) {
+                violations.add("locale-drift: controller_profile_values must be non-translatable");
+            }
+            return;
+        }
+        violations.add("locale-drift: missing controller_profile_values");
     }
 
     private static void inspectDisplayArray(Path path, Element array) {

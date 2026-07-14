@@ -20,11 +20,31 @@ final class ResourceContractTest {
         Path repo = Path.of(requiredProperty("odin.repo_dir"));
         UiResourceContractTest.verify(repo);
         assertSettingsTheme(repo.resolve("res/values/styles.xml"));
+        assertLocaleConfig(repo);
         assertLocaleMatches(repo, "values-zh-rTW");
         assertLocaleMatches(repo, "values-zh-rCN");
+        assertStableControllerProfileValues(repo.resolve("res/values/arrays.xml"));
         assertControllerLabelsAreLocalized(repo.resolve(
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
         assertHandheldActivityLayout(repo);
+    }
+
+    private static void assertLocaleConfig(Path repo) {
+        String manifest = read(repo.resolve("AndroidManifest.xml"));
+        assertTrue(manifest.contains("android:localeConfig=\"@xml/locales_config\""),
+                "application must declare its platform locale config");
+
+        Document document = parse(repo.resolve("res/xml/locales_config.xml"));
+        NodeList locales = document.getElementsByTagName("locale");
+        Set<String> names = new HashSet<>();
+        for (int i = 0; i < locales.getLength(); i++) {
+            names.add(((Element) locales.item(i)).getAttribute("android:name"));
+        }
+        Set<String> expected = new HashSet<>();
+        expected.add("en");
+        expected.add("zh-CN");
+        expected.add("zh-TW");
+        assertEquals(expected, names, "platform locale config");
     }
 
     private static void assertSettingsTheme(Path stylesPath) {
@@ -54,9 +74,26 @@ final class ResourceContractTest {
         assertEquals(resourceNames(repo.resolve("res/values/strings.xml"), "string"),
                 resourceNames(repo.resolve("res/" + locale + "/strings.xml"), "string"),
                 locale + " string resources");
-        assertEquals(resourceNames(repo.resolve("res/values/arrays.xml"), "string-array"),
+        Set<String> baseArrays = resourceNames(
+                repo.resolve("res/values/arrays.xml"), "string-array");
+        baseArrays.remove("controller_profile_values");
+        assertEquals(baseArrays,
                 resourceNames(repo.resolve("res/" + locale + "/arrays.xml"), "string-array"),
                 locale + " array resources");
+    }
+
+    private static void assertStableControllerProfileValues(Path arraysPath) {
+        Document document = parse(arraysPath);
+        NodeList arrays = document.getElementsByTagName("string-array");
+        for (int i = 0; i < arrays.getLength(); i++) {
+            Element array = (Element) arrays.item(i);
+            if ("controller_profile_values".equals(array.getAttribute("name"))) {
+                assertEquals("false", array.getAttribute("translatable"),
+                        "controller profile values must not be translated");
+                return;
+            }
+        }
+        throw new AssertionError("Missing controller_profile_values");
     }
 
     private static Set<String> resourceNames(Path path, String tagName) {

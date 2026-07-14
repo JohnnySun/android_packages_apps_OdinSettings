@@ -3,7 +3,7 @@
         <item>@string/controller_profile_standard</item>
         <item>@string/controller_profile_flipped_face</item>
     </string-array>
-    <string-array name="controller_profile_values">
+    <string-array name="controller_profile_values" translatable="false">
         <item>standard</item>
         <item>flipped_face</item>
     </string-array>
