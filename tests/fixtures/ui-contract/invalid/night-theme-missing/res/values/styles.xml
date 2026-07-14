@@ -1,0 +1,3 @@
+<resources>
+    <style name="OdinSettingsTheme" parent="@android:style/Theme.DeviceDefault.Settings" />
+</resources>

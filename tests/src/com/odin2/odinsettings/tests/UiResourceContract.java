@@ -27,6 +27,8 @@ import org.xml.sax.SAXException;
 final class UiResourceContract {
     private static final String SETTINGS_THEME =
             "@android:style/Theme.DeviceDefault.Settings";
+    private static final String NIGHT_SETTINGS_THEME =
+            "@android:style/Theme.DeviceDefault.Settings.Dark";
     private static final Set<String> SUPPORTED_LOCALES = new HashSet<>(Arrays.asList(
             "en", "zh-CN", "zh-TW"));
     private static final Set<String> VISIBLE_TEXT_ATTRIBUTES = new HashSet<>(Arrays.asList(
@@ -75,11 +77,18 @@ final class UiResourceContract {
         assertCategory(violations, "forced-theme:");
         assertCategory(violations, "locale-drift:");
         assertCategory(violations, "rtl-layout:");
+        verifyNightThemeFixture(fixture.resolve("night-theme-missing"),
+                "missing night OdinSettingsTheme");
+        verifyNightThemeFixture(fixture.resolve("night-theme-wrong-parent"),
+                "night OdinSettingsTheme must inherit " + NIGHT_SETTINGS_THEME);
     }
 
     private static List<String> inspect(Path repo) {
         List<String> violations = new ArrayList<>();
-        inspectSettingsTheme(repo.resolve("res/values/styles.xml"), violations);
+        inspectSettingsTheme(repo.resolve("res/values/styles.xml"), SETTINGS_THEME,
+                "OdinSettingsTheme", violations);
+        inspectSettingsTheme(repo.resolve("res/values-night/styles.xml"), NIGHT_SETTINGS_THEME,
+                "night OdinSettingsTheme", violations);
         inspectLocaleParity(repo.resolve("res"), violations);
         Path manifest = repo.resolve("AndroidManifest.xml");
         inspectApplicationTheme(manifest, violations);
@@ -92,9 +101,10 @@ final class UiResourceContract {
         return violations;
     }
 
-    private static void inspectSettingsTheme(Path stylesPath, List<String> violations) {
+    private static void inspectSettingsTheme(Path stylesPath, String expectedParent,
+            String description, List<String> violations) {
         if (!Files.isRegularFile(stylesPath)) {
-            violations.add("forced-theme: missing " + stylesPath);
+            violations.add("forced-theme: missing " + description);
             return;
         }
         Document document = parse(stylesPath);
@@ -104,12 +114,23 @@ final class UiResourceContract {
             if (!"OdinSettingsTheme".equals(style.getAttribute("name"))) {
                 continue;
             }
-            if (!SETTINGS_THEME.equals(style.getAttribute("parent"))) {
-                violations.add("forced-theme: OdinSettingsTheme must inherit " + SETTINGS_THEME);
+            if (!expectedParent.equals(style.getAttribute("parent"))) {
+                violations.add("forced-theme: " + description + " must inherit "
+                        + expectedParent);
             }
             return;
         }
-        violations.add("forced-theme: missing OdinSettingsTheme");
+        violations.add("forced-theme: missing " + description);
+    }
+
+    private static void verifyNightThemeFixture(Path fixture, String expectedViolation) {
+        List<String> violations = new ArrayList<>();
+        inspectSettingsTheme(fixture.resolve("res/values-night/styles.xml"),
+                NIGHT_SETTINGS_THEME, "night OdinSettingsTheme", violations);
+        if (violations.size() != 1 || !violations.get(0).contains(expectedViolation)) {
+            throw new AssertionError("Night theme fixture did not trigger expected violation '"
+                    + expectedViolation + "': " + violations);
+        }
     }
 
     private static void inspectApplicationTheme(Path manifestPath, List<String> violations) {
@@ -384,6 +405,9 @@ final class UiResourceContract {
         }
         if (!source.contains("?android:attr/textAppearance")) {
             violations.add("large-font: controller test must use theme text appearances");
+        }
+        if (source.contains("android:text=\"@string/controller_test_title\"")) {
+            violations.add("duplicate-title: controller test title must come from the ActionBar");
         }
     }
 
