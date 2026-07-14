@@ -7,6 +7,7 @@ homebrew=${HOMEBREW_PREFIX:-/opt/homebrew}
 jdk_home=${JAVA_HOME:-}
 javac_cmd=
 java_cmd=
+cxx_cmd=${CXX:-}
 
 if [[ -z "$jdk_home" && -x "$homebrew/bin/brew" ]]; then
   jdk_home="$($homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
@@ -36,8 +37,29 @@ else
   exit 1
 fi
 
-classes_dir=$(mktemp -d "${TMPDIR:-/tmp}/odinsettings-tests.XXXXXX")
-trap 'rm -rf "$classes_dir"' EXIT
+if [[ -z "$cxx_cmd" ]]; then
+  cxx_cmd=$(command -v c++ || true)
+fi
+if [[ -z "$cxx_cmd" ]]; then
+  echo "A C++ compiler is required (set CXX or provide c++ on PATH)." >&2
+  exit 1
+fi
+
+test_dir=$(mktemp -d "${TMPDIR:-/tmp}/odinsettings-tests.XXXXXX")
+classes_dir="$test_dir/classes"
+mkdir -p "$classes_dir"
+trap 'rm -rf "$test_dir"' EXIT
+
+"$cxx_cmd" \
+  -std=c++17 \
+  -Wall \
+  -Wextra \
+  -Werror \
+  -I"$repo_dir/jni" \
+  "$repo_dir/jni/fan_control.cpp" \
+  "$repo_dir/tests/native/fan_control_test.cpp" \
+  -o "$test_dir/fan_control_test"
+"$test_dir/fan_control_test"
 
 sources=()
 while IFS= read -r source; do
@@ -51,6 +73,9 @@ done < <(
     "$repo_dir/src/com/odin2/odinsettings/service" \
     "$repo_dir/tests/src" \
     -name '*.java' -print | sort
+)
+sources+=(
+  "$repo_dir/src/com/odin2/odinsettings/platform/NativeFanController.java"
 )
 
 "$javac_cmd" -Xlint:all -Werror -d "$classes_dir" "${sources[@]}"

@@ -12,9 +12,35 @@ android_app {
 cc_library_shared {
     name: "libodinsettings_fan_status_jni",
     srcs: ["jni/fan_status_jni.cpp"],
-    static_libs: ["libayn_fan_status_core"],
+    static_libs: ["libodinsettings_fan_control_core"],
     shared_libs: ["libbase"],
     header_libs: ["jni_headers"],
+    cpp_std: "c++17",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}
+
+cc_library_static {
+    name: "libodinsettings_fan_control_core",
+    srcs: ["jni/fan_control.cpp"],
+    export_include_dirs: ["jni"],
+    host_supported: true,
+    cpp_std: "c++17",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}
+
+cc_test_host {
+    name: "OdinSettingsFanControlHostTests",
+    srcs: ["tests/native/fan_control_test.cpp"],
+    static_libs: ["libodinsettings_fan_control_core"],
+    cpp_std: "c++17",
     cflags: [
         "-Wall",
         "-Wextra",
@@ -28,6 +54,7 @@ java_test_host {
         "src/com/odin2/odinsettings/domain/**/*.java",
         "src/com/odin2/odinsettings/display/**/*.java",
         "src/com/odin2/odinsettings/hardware/**/*.java",
+        "src/com/odin2/odinsettings/platform/NativeFanController.java",
         "src/com/odin2/odinsettings/policy/**/*.java",
         "src/com/odin2/odinsettings/service/**/*.java",
         "tests/src/**/*.java",

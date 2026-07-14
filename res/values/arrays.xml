@@ -7,4 +7,14 @@
         <item>standard</item>
         <item>flipped_face</item>
     </string-array>
+    <string-array name="fan_mode_entries">
+        <item>@string/fan_mode_off</item>
+        <item>@string/fan_mode_quiet</item>
+        <item>@string/fan_mode_sport</item>
+    </string-array>
+    <string-array name="fan_mode_values" translatable="false">
+        <item>off</item>
+        <item>quiet</item>
+        <item>sport</item>
+    </string-array>
 </resources>

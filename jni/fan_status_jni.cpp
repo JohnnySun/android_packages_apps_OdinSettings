@@ -1,4 +1,4 @@
-#include "ayn/fan_status.h"
+#include "fan_control.h"
 
 #include <android-base/file.h>
 #include <android-base/properties.h>
@@ -9,54 +9,48 @@
 
 namespace {
 
-constexpr jint kResultAvailable = 0;
-constexpr jint kResultUnsupported = 1;
-constexpr jint kResultUnexpectedPaths = 2;
-constexpr jint kResultUnavailable = 3;
-constexpr jint kResultMalformed = 4;
-
 bool ReadFile(void*, const std::string& path, std::string* value) {
   return android::base::ReadFileToString(path, value);
 }
 
-jint ToJavaResult(ayn::fan::FanStatusResult result) {
-  switch (result) {
-    case ayn::fan::FanStatusResult::kAvailable:
-      return kResultAvailable;
-    case ayn::fan::FanStatusResult::kUnsupportedDevice:
-      return kResultUnsupported;
-    case ayn::fan::FanStatusResult::kUnexpectedPaths:
-      return kResultUnexpectedPaths;
-    case ayn::fan::FanStatusResult::kUnavailableRead:
-      return kResultUnavailable;
-    case ayn::fan::FanStatusResult::kMalformedValue:
-      return kResultMalformed;
-  }
-  return kResultMalformed;
+bool WriteFile(void*, const std::string& path, const std::string& value) {
+  return android::base::WriteStringToFile(value, path);
 }
 
-}  // namespace
-
-extern "C" JNIEXPORT jintArray JNICALL
-Java_com_odin2_odinsettings_platform_NativeFanStatusReader_nativeRead(
-    JNIEnv* env, jclass) {
-  const ayn::fan::FanStatusIdentity identity{
+odin::fan::Identity CurrentIdentity() {
+  return {
+      android::base::GetProperty("ro.product.model", ""),
       android::base::GetProperty("ro.product.device", ""),
-      android::base::GetProperty("ro.vendor.retro.name", ""),
-      android::base::GetProperty("ro.product.vendor.model", ""),
+      android::base::GetProperty("ro.product.name", ""),
+      android::base::GetProperty("ro.soc.model", ""),
   };
-  const ayn::fan::FanStatusPaths paths{
+}
+
+odin::fan::Paths FanPaths() {
+  return {
       "/sys/class/gpio5_pwm2/state",
       "/sys/class/gpio5_pwm2/duty",
+      "/sys/class/gpio5_pwm2/period",
+      "/sys/class/gpio5_pwm2/speed",
   };
-  const ayn::fan::FanStatusRead status =
-      ayn::fan::ReadFanStatus(identity, paths, ReadFile, nullptr);
+}
 
-  std::array<jint, 3> values{ToJavaResult(status.result), -1, -1};
-  if (status.result == ayn::fan::FanStatusResult::kAvailable &&
-      status.snapshot.has_value()) {
-    values[1] = status.snapshot->state;
-    values[2] = status.snapshot->duty;
+odin::fan::FileOps Files() {
+  return {ReadFile, WriteFile, nullptr};
+}
+
+jintArray ToJavaResult(JNIEnv* env, const odin::fan::ControlResult& result) {
+  std::array<jint, 5> values{
+      static_cast<jint>(result.result),
+      result.has_requested_mode ? result.requested_mode : -1,
+      -1,
+      -1,
+      -1,
+  };
+  if (result.has_snapshot) {
+    values[2] = result.snapshot.state;
+    values[3] = result.snapshot.pwm_high_time_ns;
+    values[4] = result.snapshot.tach_pulses_times_300;
   }
 
   jintArray output = env->NewIntArray(static_cast<jsize>(values.size()));
@@ -66,4 +60,21 @@ Java_com_odin2_odinsettings_platform_NativeFanStatusReader_nativeRead(
   env->SetIntArrayRegion(output, 0, static_cast<jsize>(values.size()),
                          values.data());
   return output;
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_odin2_odinsettings_platform_NativeFanController_nativeRead(
+    JNIEnv* env, jclass) {
+  return ToJavaResult(
+      env, odin::fan::ReadStatus(CurrentIdentity(), FanPaths(), Files()));
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_odin2_odinsettings_platform_NativeFanController_nativeApply(
+    JNIEnv* env, jclass, jint requested_mode) {
+  return ToJavaResult(
+      env, odin::fan::ApplyMode(CurrentIdentity(), FanPaths(), requested_mode,
+                                Files()));
 }

@@ -27,7 +27,7 @@ final class ResourceContractTest {
         assertControllerLabelsAreLocalized(repo.resolve(
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
         assertHandheldActivityLayout(repo);
-        assertFanStatusIsReadOnly(repo);
+        assertFanControlIsAllowlisted(repo);
     }
 
     private static void assertLocaleConfig(Path repo) {
@@ -78,6 +78,7 @@ final class ResourceContractTest {
         Set<String> baseArrays = resourceNames(
                 repo.resolve("res/values/arrays.xml"), "string-array");
         baseArrays.remove("controller_profile_values");
+        baseArrays.remove("fan_mode_values");
         assertEquals(baseArrays,
                 resourceNames(repo.resolve("res/" + locale + "/arrays.xml"), "string-array"),
                 locale + " array resources");
@@ -196,63 +197,89 @@ final class ResourceContractTest {
                 "profile dialog must visibly select the checked row");
     }
 
-    private static void assertFanStatusIsReadOnly(Path repo) {
+    private static void assertFanControlIsAllowlisted(Path repo) {
         Document preferences = parse(repo.resolve("res/xml/main_preferences.xml"));
-        NodeList rows = preferences.getElementsByTagName("Preference");
-        Element fanStatus = null;
+        NodeList rows = preferences.getElementsByTagName(
+                "com.odin2.odinsettings.widget.ControllerListPreference");
+        Element fanMode = null;
         for (int i = 0; i < rows.getLength(); i++) {
             Element row = (Element) rows.item(i);
-            if ("fan_status".equals(row.getAttribute("android:key"))) {
-                fanStatus = row;
+            if ("fan_mode".equals(row.getAttribute("android:key"))) {
+                fanMode = row;
                 break;
             }
         }
-        assertTrue(fanStatus != null, "fan status row must exist");
-        assertEquals("false", fanStatus.getAttribute("android:selectable"),
-                "fan status row must be read-only");
-        assertFalse("false".equals(fanStatus.getAttribute("android:enabled")),
-                "fan status row must remain readable instead of disabled");
+        assertTrue(fanMode != null, "fan mode choice must exist");
+        assertEquals("@array/fan_mode_entries", fanMode.getAttribute("android:entries"),
+                "fan mode entries");
+        assertEquals("@array/fan_mode_values", fanMode.getAttribute("android:entryValues"),
+                "fan mode values");
+        assertEquals("false", fanMode.getAttribute("android:persistent"),
+                "fan mode must not persist a stale hardware request");
+
+        String arrays = read(repo.resolve("res/values/arrays.xml"));
+        assertTrue(arrays.contains("name=\"fan_mode_values\" translatable=\"false\""),
+                "fan mode values must be stable and non-translatable");
+        assertTrue(arrays.contains("<item>off</item>"), "fan modes must include off");
+        assertTrue(arrays.contains("<item>quiet</item>"), "fan modes must include quiet");
+        assertTrue(arrays.contains("<item>sport</item>"), "fan modes must include sport");
+        assertFalse(arrays.toLowerCase().contains("custom"),
+                "fan UI must not expose a custom mode");
+        assertFalse(read(repo.resolve("res/xml/main_preferences.xml")).contains("SeekBar"),
+                "fan UI must not expose an arbitrary high-time slider");
 
         String activity = read(repo.resolve(
                 "src/com/odin2/odinsettings/MainSettingsActivity.java"));
         assertTrue(activity.contains("protected void onResume()"),
                 "fan status must refresh when the settings screen resumes");
-        assertTrue(activity.contains("fanStatusReader.read()"),
-                "fan status must use the dedicated read-only reader");
-        assertFalse(activity.contains("fanStatus.setOnPreferenceClickListener"),
-                "fan status must not expose a click action");
+        assertTrue(activity.contains("fanController.read()"),
+                "fan status must use the dedicated controller");
+        assertTrue(activity.contains("fanController.apply(requestedMode)"),
+                "fan mode changes must use the dedicated controller");
+        assertTrue(activity.contains("setOnPreferenceChangeListener"),
+                "fan mode must be applied only after a confirmed radio choice");
+        assertTrue(activity.contains("protected void onSaveInstanceState(Bundle outState)"),
+                "requested fan mode must survive activity recreation");
+        assertTrue(activity.contains("STATE_REQUESTED_FAN_MODE"),
+                "requested fan mode restoration must use saved instance state");
 
         String blueprint = read(repo.resolve("Android.bp"));
         assertTrue(blueprint.contains("jni_libs: [\"libodinsettings_fan_status_jni\"]"),
-                "Odin Settings must package the fan status JNI bridge");
+                "Odin Settings must package the fan control JNI bridge");
         String jniModule = module(blueprint, "libodinsettings_fan_status_jni");
-        assertTrue(jniModule.contains("\"libayn_fan_status_core\""),
-                "fan status JNI must link the read-only core");
-        for (String forbidden : new String[] {
-                "libayn_fan_service_core", "libayn_fan_policy", "odinfand"}) {
-            assertFalse(jniModule.contains(forbidden),
-                    "fan status JNI must not link " + forbidden);
-        }
+        assertTrue(jniModule.contains("\"libodinsettings_fan_control_core\""),
+                "fan JNI must link the locally tested control core");
 
         String nativeSource = read(repo.resolve("jni/fan_status_jni.cpp"));
-        for (String forbidden : new String[] {
-                "O_WRONLY", "O_RDWR", "chmod", "setprop", "SetProperty",
-                "SysfsWriter", "WriteStringToFile", "write("}) {
-            assertFalse(nativeSource.contains(forbidden),
-                    "fan status JNI must not expose " + forbidden);
-        }
+        assertTrue(nativeSource.contains("WriteStringToFile"),
+                "fan JNI must use the bounded native write adapter");
+        assertFalse(nativeSource.contains("chmod"), "fan JNI must not change permissions");
+        assertFalse(nativeSource.contains("SetProperty"), "fan JNI must not set properties");
+        assertTrue(nativeSource.contains("ro.product.model"),
+                "fan JNI must pass the exact Android model identity");
         assertTrue(nativeSource.contains("ro.product.device"),
                 "fan status JNI must pass the exact Android product identity");
-        assertTrue(nativeSource.contains("ro.vendor.retro.name"),
-                "fan status JNI must pass the exact stock retro identity");
-        assertTrue(nativeSource.contains("ro.product.vendor.model"),
-                "fan status JNI must pass the exact preserved vendor model identity");
+        assertTrue(nativeSource.contains("ro.product.name"),
+                "fan JNI must pass the exact Android product identity");
+        assertTrue(nativeSource.contains("ro.soc.model"),
+                "fan JNI must pass the exact SoC identity");
         assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/state"),
-                "fan status JNI must use the exact observed state path");
+                "fan JNI must use the exact observed state path");
         assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/duty"),
-                "fan status JNI must use the exact observed duty path");
-        assertFalse(nativeSource.contains("/sys/class/gpio5_pwm2/speed"),
-                "fan status JNI must not infer speed semantics");
+                "fan JNI must use the exact observed high-time path");
+        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/period"),
+                "fan JNI must use the exact observed period path");
+        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/speed"),
+                "fan JNI must read the exact observed tach path");
+
+        for (String locale : new String[] {
+                "values", "values-zh-rCN", "values-zh-rTW"}) {
+            String strings = read(repo.resolve("res/" + locale + "/strings.xml"));
+            assertFalse(strings.toLowerCase().contains("duty"),
+                    locale + " fan status must not label high-time as duty");
+            assertFalse(strings.contains("RPM"),
+                    locale + " fan status must not label tach as RPM");
+        }
     }
 
     private static String module(String blueprint, String name) {

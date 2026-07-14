@@ -3,4 +3,9 @@
         <item>@string/controller_profile_standard</item>
         <item>@string/controller_profile_flipped_face</item>
     </string-array>
+    <string-array name="fan_mode_entries">
+        <item>@string/fan_mode_off</item>
+        <item>@string/fan_mode_quiet</item>
+        <item>@string/fan_mode_sport</item>
+    </string-array>
 </resources>

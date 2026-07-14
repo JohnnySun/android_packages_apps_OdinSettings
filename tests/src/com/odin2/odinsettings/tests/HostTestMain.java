@@ -8,7 +8,9 @@ import com.odin2.odinsettings.hardware.AdapterCapability;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
-import com.odin2.odinsettings.hardware.FanStatusRead;
+import com.odin2.odinsettings.hardware.FanActualState;
+import com.odin2.odinsettings.hardware.FanControlResult;
+import com.odin2.odinsettings.hardware.FanMode;
 import com.odin2.odinsettings.hardware.HardwareAdapter;
 import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
@@ -30,7 +32,9 @@ public final class HostTestMain {
         capabilityGatePreventsUnsupportedCalls();
         reviewedAdapterCanReceiveRecognizedProfile();
         externalDisplayUsesTheSameIdentityAndCapabilityGates();
-        fanStatusResultCannotCarryPartialOrInvalidData();
+        fanModesAreStrictlyAllowlisted();
+        fanStatusClassifiesActualStateTruthfully();
+        fanControlErrorsCannotCarryPartialData();
         ResourceContractTest.verify();
         pass();
 
@@ -174,42 +178,85 @@ public final class HostTestMain {
         return new DeviceIdentity("Odin2_Mini", "kalama", "kalama", "QCS8550");
     }
 
-    private static void fanStatusResultCannotCarryPartialOrInvalidData() {
-        FanStatusRead available = FanStatusRead.available(1, 10000);
-        assertEquals(FanStatusRead.Code.AVAILABLE, available.code,
-                "available fan status code");
-        assertTrue(available.hasSnapshot(), "available fan status snapshot");
-        assertEquals(1, available.state, "available fan state");
-        assertEquals(10000, available.duty, "available fan duty");
+    private static void fanModesAreStrictlyAllowlisted() {
+        assertEquals(FanMode.OFF, FanMode.fromPreferenceValue("off"), "off mode");
+        assertEquals(FanMode.QUIET, FanMode.fromPreferenceValue("quiet"), "quiet mode");
+        assertEquals(FanMode.SPORT, FanMode.fromPreferenceValue("sport"), "sport mode");
+        assertEquals(3, FanMode.values().length, "fan mode allowlist size");
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                FanMode.fromPreferenceValue("custom");
+            }
+        }, "custom fan mode must be rejected");
+        pass();
+    }
 
-        for (FanStatusRead.Code code : new FanStatusRead.Code[] {
-                FanStatusRead.Code.UNSUPPORTED,
-                FanStatusRead.Code.UNAVAILABLE,
-                FanStatusRead.Code.MALFORMED,
+    private static void fanStatusClassifiesActualStateTruthfully() {
+        FanControlResult offWithCachedHighTime =
+                FanControlResult.available(FanMode.OFF, 0, 25000, 3300);
+        assertEquals(FanActualState.OFF, offWithCachedHighTime.actualState,
+                "state zero is actually off despite cached values");
+        assertEquals(25000, offWithCachedHighTime.pwmHighTimeNs,
+                "off snapshot preserves stored high-time");
+        assertEquals(3300, offWithCachedHighTime.tachPulsesTimes300,
+                "tach remains pulses times 300");
+
+        assertEquals(FanActualState.QUIET,
+                FanControlResult.available(FanMode.QUIET, 1, 5000, 1200).actualState,
+                "quiet actual state");
+        assertEquals(FanActualState.SPORT,
+                FanControlResult.available(FanMode.SPORT, 1, 25000, 3300).actualState,
+                "sport actual state");
+        assertEquals(FanActualState.UNRECOGNIZED,
+                FanControlResult.available(null, 1, 10000, 1800).actualState,
+                "unknown enabled high-time must not invent a mode");
+        pass();
+    }
+
+    private static void fanControlErrorsCannotCarryPartialData() {
+        for (FanControlResult.Code code : new FanControlResult.Code[] {
+                FanControlResult.Code.UNSUPPORTED,
+                FanControlResult.Code.UNEXPECTED_PATHS,
+                FanControlResult.Code.UNAVAILABLE,
+                FanControlResult.Code.MALFORMED,
+                FanControlResult.Code.PERIOD_MISMATCH,
+                FanControlResult.Code.WRITE_FAILED,
+                FanControlResult.Code.READBACK_MISMATCH,
+                FanControlResult.Code.INVALID_MODE,
         }) {
-            FanStatusRead error = FanStatusRead.error(code);
+            FanControlResult error = FanControlResult.error(code, FanMode.SPORT);
             assertEquals(code, error.code, "fan error code");
             assertFalse(error.hasSnapshot(), "fan error must not carry a snapshot");
             assertEquals(-1, error.state, "fan error state sentinel");
-            assertEquals(-1, error.duty, "fan error duty sentinel");
+            assertEquals(-1, error.pwmHighTimeNs, "fan error high-time sentinel");
+            assertEquals(-1, error.tachPulsesTimes300, "fan error tach sentinel");
+            assertEquals(FanMode.SPORT, error.requestedMode,
+                    "fan error must preserve the requested mode");
         }
 
         assertThrows(new Runnable() {
             @Override
             public void run() {
-                FanStatusRead.available(2, 10000);
+                FanControlResult.available(FanMode.OFF, 2, 10000, 0);
             }
         }, "invalid fan state must be rejected");
         assertThrows(new Runnable() {
             @Override
             public void run() {
-                FanStatusRead.available(1, -1);
+                FanControlResult.available(FanMode.QUIET, 1, -1, 0);
             }
-        }, "negative fan duty must be rejected");
+        }, "negative fan high-time must be rejected");
         assertThrows(new Runnable() {
             @Override
             public void run() {
-                FanStatusRead.error(FanStatusRead.Code.AVAILABLE);
+                FanControlResult.available(FanMode.QUIET, 1, 5000, -1);
+            }
+        }, "negative fan tach must be rejected");
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                FanControlResult.error(FanControlResult.Code.AVAILABLE, FanMode.OFF);
             }
         }, "available code cannot be constructed without a snapshot");
         pass();

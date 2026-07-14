@@ -17,16 +17,17 @@ The Android 16 increment currently provides:
   injecting events or changing the system mapping.
 - A policy and privileged-adapter boundary that denies unknown devices and
   remains unavailable even on recognized Odin hardware.
-- Read-only external-display and hardware-control status.
+- Read-only external-display status and an allowlisted, fail-closed fan mode
+  control for Off, Quiet, and Sport.
 - Fail-closed keep-screen-on and force-landscape quick settings tiles.
 
 Stock behavior and safety evidence is summarized in
 `docs/stock-control-matrix.md`. No proprietary APK, native library, resource, or
 decompiled implementation is part of this repository.
 
-System-wide event injection, touch overlays, fan control, MCU access, joystick
-calibration, HDMI node writes, firmware updates, root, and OTA behavior remain
-disabled until each path has dedicated evidence and review.
+System-wide event injection, touch overlays, arbitrary fan tuning, MCU access,
+joystick calibration, HDMI node writes, firmware updates, root, and OTA behavior
+remain disabled until each path has dedicated evidence and review.
 
 Workbench: `JohnnySun/odin2-mini`
 

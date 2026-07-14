@@ -13,29 +13,43 @@ import android.widget.ListView;
 
 import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
-import com.odin2.odinsettings.hardware.FanStatusRead;
-import com.odin2.odinsettings.hardware.FanStatusReader;
+import com.odin2.odinsettings.hardware.FanActualState;
+import com.odin2.odinsettings.hardware.FanControlResult;
+import com.odin2.odinsettings.hardware.FanController;
+import com.odin2.odinsettings.hardware.FanMode;
 import com.odin2.odinsettings.platform.AndroidDeviceIdentity;
 import com.odin2.odinsettings.platform.ControllerNavigation;
-import com.odin2.odinsettings.platform.NativeFanStatusReader;
+import com.odin2.odinsettings.platform.NativeFanController;
 import com.odin2.odinsettings.policy.AccessDecision;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
+import com.odin2.odinsettings.widget.ControllerListPreference;
 
 public final class MainSettingsActivity extends PreferenceActivity {
+    private static final String STATE_REQUESTED_FAN_MODE = "requested_fan_mode";
+
     private ListView preferenceList;
     private int lastFocusedPosition = ListView.INVALID_POSITION;
     private boolean controllerFocusActive;
-    private final FanStatusReader fanStatusReader = new NativeFanStatusReader();
-    private Preference fanStatus;
+    private final FanController fanController = new NativeFanController();
+    private ControllerListPreference fanModePreference;
+    private FanMode lastRequestedMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         addPreferencesFromResource(R.xml.main_preferences);
+        restoreRequestedFanMode(savedInstanceState);
 
         Preference controllerTest = findPreference("controller_input_test");
         controllerTest.setIntent(new Intent(this, ControllerTestActivity.class));
-        fanStatus = findPreference("fan_status");
+        fanModePreference = (ControllerListPreference) findPreference("fan_mode");
+        fanModePreference.setOnPreferenceChangeListener(
+                new Preference.OnPreferenceChangeListener() {
+                    @Override
+                    public boolean onPreferenceChange(Preference preference, Object newValue) {
+                        return applyFanMode(String.valueOf(newValue));
+                    }
+                });
         updateFanStatus();
 
         AccessDecision identity = new HardwareAccessPolicy().evaluate(
@@ -62,27 +76,140 @@ public final class MainSettingsActivity extends PreferenceActivity {
         updateFanStatus();
     }
 
-    private void updateFanStatus() {
-        if (fanStatus == null) {
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (lastRequestedMode != null) {
+            outState.putString(STATE_REQUESTED_FAN_MODE,
+                    lastRequestedMode.preferenceValue);
+        }
+        super.onSaveInstanceState(outState);
+    }
+
+    private void restoreRequestedFanMode(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
             return;
         }
-        FanStatusRead status = fanStatusReader.read();
-        switch (status.code) {
-            case AVAILABLE:
-                fanStatus.setSummary(status.state == 1
-                        ? getString(R.string.fan_status_active_summary, status.duty)
-                        : getString(R.string.fan_status_inactive_summary, status.duty));
+        String savedMode = savedInstanceState.getString(STATE_REQUESTED_FAN_MODE);
+        if (savedMode == null) {
+            return;
+        }
+        try {
+            lastRequestedMode = FanMode.fromPreferenceValue(savedMode);
+        } catch (IllegalArgumentException exception) {
+            lastRequestedMode = null;
+        }
+    }
+
+    private void updateFanStatus() {
+        if (fanModePreference == null) {
+            return;
+        }
+        renderFanStatus(fanController.read());
+    }
+
+    private boolean applyFanMode(String value) {
+        final FanMode requestedMode;
+        try {
+            requestedMode = FanMode.fromPreferenceValue(value);
+        } catch (IllegalArgumentException exception) {
+            renderFanStatus(FanControlResult.error(
+                    FanControlResult.Code.INVALID_MODE, lastRequestedMode));
+            return false;
+        }
+        lastRequestedMode = requestedMode;
+        FanControlResult result = fanController.apply(requestedMode);
+        renderFanStatus(result);
+        return result.hasSnapshot();
+    }
+
+    private void renderFanStatus(FanControlResult status) {
+        FanMode requestedMode = status.requestedMode != null
+                ? status.requestedMode
+                : lastRequestedMode;
+        String requested = requestedMode == null
+                ? getString(R.string.fan_request_none)
+                : getString(modeLabel(requestedMode));
+
+        if (!status.hasSnapshot()) {
+            fanModePreference.setSummary(getString(
+                    R.string.fan_status_error_summary, requested, getString(errorReason(status))));
+            return;
+        }
+
+        syncFanChoice(status.actualState);
+        if (status.actualState == FanActualState.OFF) {
+            fanModePreference.setSummary(getString(R.string.fan_status_off_summary,
+                    requested, status.pwmHighTimeNs, status.tachPulsesTimes300));
+            return;
+        }
+        fanModePreference.setSummary(getString(R.string.fan_status_on_summary,
+                requested, getString(actualStateLabel(status.actualState)),
+                status.pwmHighTimeNs, status.tachPulsesTimes300));
+    }
+
+    private void syncFanChoice(FanActualState actualState) {
+        switch (actualState) {
+            case OFF:
+                fanModePreference.setValue(FanMode.OFF.preferenceValue);
                 break;
-            case UNSUPPORTED:
-                fanStatus.setSummary(R.string.fan_status_unsupported_summary);
+            case QUIET:
+                fanModePreference.setValue(FanMode.QUIET.preferenceValue);
                 break;
-            case UNAVAILABLE:
-                fanStatus.setSummary(R.string.fan_status_unavailable_summary);
+            case SPORT:
+                fanModePreference.setValue(FanMode.SPORT.preferenceValue);
                 break;
-            case MALFORMED:
-                fanStatus.setSummary(R.string.fan_status_malformed_summary);
+            case UNRECOGNIZED:
                 break;
         }
+    }
+
+    private static int modeLabel(FanMode mode) {
+        switch (mode) {
+            case OFF:
+                return R.string.fan_mode_off;
+            case QUIET:
+                return R.string.fan_mode_quiet;
+            case SPORT:
+                return R.string.fan_mode_sport;
+        }
+        throw new IllegalArgumentException("Unknown fan mode");
+    }
+
+    private static int actualStateLabel(FanActualState state) {
+        switch (state) {
+            case OFF:
+                return R.string.fan_actual_off;
+            case QUIET:
+                return R.string.fan_actual_quiet;
+            case SPORT:
+                return R.string.fan_actual_sport;
+            case UNRECOGNIZED:
+                return R.string.fan_actual_unrecognized;
+        }
+        throw new IllegalArgumentException("Unknown fan state");
+    }
+
+    private static int errorReason(FanControlResult status) {
+        switch (status.code) {
+            case UNSUPPORTED:
+                return R.string.fan_error_unsupported;
+            case UNEXPECTED_PATHS:
+                return R.string.fan_error_unexpected_paths;
+            case PERIOD_MISMATCH:
+                return R.string.fan_error_period_mismatch;
+            case WRITE_FAILED:
+                return R.string.fan_error_write_failed;
+            case READBACK_MISMATCH:
+                return R.string.fan_error_readback_mismatch;
+            case INVALID_MODE:
+                return R.string.fan_error_invalid_mode;
+            case MALFORMED:
+                return R.string.fan_error_malformed;
+            case UNAVAILABLE:
+            case AVAILABLE:
+                return R.string.fan_error_unavailable;
+        }
+        return R.string.fan_error_unavailable;
     }
 
     @Override
