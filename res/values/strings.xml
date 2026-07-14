@@ -15,6 +15,8 @@
     <string name="physical_button_label">Physical input</string>
     <string name="preview_output_label">Mapped preview</string>
     <string name="no_button_detected">No button detected</string>
+    <string name="controller_test_result_announcement">Physical input %1$s. Mapped preview %2$s.</string>
+    <string name="done">Done</string>
     <string name="system_mapping_title">System-wide controller mapping</string>
     <string name="system_mapping_unavailable_summary">Unavailable until the privileged input adapter is validated.</string>
     <string name="unrecognized_device_summary">Unavailable on unrecognized hardware.</string>

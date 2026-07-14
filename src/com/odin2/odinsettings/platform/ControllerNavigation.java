@@ -18,6 +18,21 @@ public final class ControllerNavigation {
         return isControllerEvent(event) && event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_A;
     }
 
+    public static boolean isDirectional(KeyEvent event) {
+        if (!isControllerEvent(event)) {
+            return false;
+        }
+        switch (event.getKeyCode()) {
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public static KeyEvent translateConfirm(KeyEvent event) {
         if (!isConfirm(event)) {
             return event;

@@ -30,11 +30,15 @@ final class ResourceContractTest {
     private static void assertSettingsTheme(Path stylesPath) {
         Document document = parse(stylesPath);
         NodeList styles = document.getElementsByTagName("style");
+        assertEquals(1, styles.getLength(),
+                "app resources must define exactly one theme style");
         for (int i = 0; i < styles.getLength(); i++) {
             Element style = (Element) styles.item(i);
             if ("OdinSettingsTheme".equals(style.getAttribute("name"))) {
                 assertEquals("@android:style/Theme.DeviceDefault.Settings",
                         style.getAttribute("parent"), "OdinSettingsTheme parent");
+                assertEquals(0, style.getElementsByTagName("item").getLength(),
+                        "OdinSettingsTheme must inherit all system colors and appearance");
                 String xml = read(stylesPath);
                 assertFalse(xml.contains("windowLightStatusBar"),
                         "theme must not force light status bar icons");
@@ -86,6 +90,12 @@ final class ResourceContractTest {
                 "main settings must handle gamepad B as back");
         assertTrue(mainActivity.contains("focusFirstEnabledPreference"),
                 "main settings must expose an initial D-pad focus target");
+        assertTrue(mainActivity.contains("onWindowFocusChanged"),
+                "main settings must restore controller focus after dialogs close");
+        assertTrue(mainActivity.contains("activateControllerFocus"),
+                "main settings must restore selection when controller input follows touch");
+        assertTrue(mainActivity.contains("MotionEvent.ACTION_DOWN"),
+                "main settings must remember the row last chosen by touch");
 
         String controllerTest = read(repo.resolve(
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
@@ -95,6 +105,16 @@ final class ResourceContractTest {
                 "controller test must handle the up affordance");
         assertTrue(controllerTest.contains("ControllerNavigation.isBack"),
                 "controller test must remain escapable with gamepad B");
+        assertTrue(controllerTest.contains("ControllerNavigation.translateConfirm"),
+                "controller test must use gamepad A as focused-control activation");
+        assertTrue(controllerTest.contains("ScrollView"),
+                "controller test must scroll in landscape and at large font scales");
+        assertTrue(controllerTest.contains("R.string.done"),
+                "controller test must expose a visible focusable exit action");
+        assertTrue(controllerTest.contains("setLabelFor"),
+                "controller test status labels must identify their dynamic values");
+        assertTrue(controllerTest.contains("ACCESSIBILITY_LIVE_REGION_POLITE"),
+                "controller test results must be exposed as accessibility live regions");
 
         String preferences = read(repo.resolve("res/xml/main_preferences.xml"));
         assertTrue(preferences.contains("ControllerListPreference"),
@@ -105,6 +125,12 @@ final class ResourceContractTest {
                 "profile dialog must receive controller navigation events");
         assertTrue(listPreference.contains("performItemClick"),
                 "profile dialog must activate its focused row with gamepad A");
+        assertTrue(listPreference.contains("showDialog(Bundle state)"),
+                "profile dialog must initialize an explicit controller selection");
+        assertTrue(listPreference.contains("requestFocus"),
+                "profile dialog list must receive visible controller focus");
+        assertTrue(listPreference.contains("setSelection"),
+                "profile dialog must visibly select the checked row");
     }
 
     private static Document parse(Path path) {

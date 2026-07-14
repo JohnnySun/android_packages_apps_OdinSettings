@@ -1,8 +1,10 @@
 package com.odin2.odinsettings.widget;
 
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.os.Bundle;
 import android.preference.ListPreference;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -39,6 +41,30 @@ public final class ControllerListPreference extends ListPreference {
                     clickSelectedRow((AlertDialog) dialog);
                 }
                 return true;
+            }
+        });
+    }
+
+    @Override
+    protected void showDialog(Bundle state) {
+        super.showDialog(state);
+        Dialog currentDialog = getDialog();
+        if (!(currentDialog instanceof AlertDialog)) {
+            return;
+        }
+        final ListView list = ((AlertDialog) currentDialog).getListView();
+        list.setFocusableInTouchMode(true);
+        list.post(new Runnable() {
+            @Override
+            public void run() {
+                int position = list.getCheckedItemPosition();
+                if (position == ListView.INVALID_POSITION) {
+                    position = findIndexOfValue(getValue());
+                }
+                list.requestFocus();
+                if (position != ListView.INVALID_POSITION) {
+                    list.setSelection(position);
+                }
             }
         });
     }
