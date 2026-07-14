@@ -43,6 +43,7 @@ Java_com_odin2_odinsettings_platform_NativeFanStatusReader_nativeRead(
   const ayn::fan::FanStatusIdentity identity{
       android::base::GetProperty("ro.product.device", ""),
       android::base::GetProperty("ro.vendor.retro.name", ""),
+      android::base::GetProperty("ro.product.vendor.model", ""),
   };
   const ayn::fan::FanStatusPaths paths{
       "/sys/class/gpio5_pwm2/state",

@@ -245,6 +245,8 @@ final class ResourceContractTest {
                 "fan status JNI must pass the exact Android product identity");
         assertTrue(nativeSource.contains("ro.vendor.retro.name"),
                 "fan status JNI must pass the exact stock retro identity");
+        assertTrue(nativeSource.contains("ro.product.vendor.model"),
+                "fan status JNI must pass the exact preserved vendor model identity");
         assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/state"),
                 "fan status JNI must use the exact observed state path");
         assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/duty"),
