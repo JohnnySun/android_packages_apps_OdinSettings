@@ -107,17 +107,39 @@ final class ResourceContractTest {
                 "controller test must remain escapable with gamepad B");
         assertTrue(controllerTest.contains("ControllerNavigation.translateConfirm"),
                 "controller test must use gamepad A as focused-control activation");
-        assertTrue(controllerTest.contains("ScrollView"),
-                "controller test must scroll in landscape and at large font scales");
-        assertTrue(controllerTest.contains("R.string.done"),
-                "controller test must expose a visible focusable exit action");
-        assertTrue(controllerTest.contains("setLabelFor"),
-                "controller test status labels must identify their dynamic values");
-        assertTrue(controllerTest.contains("ACCESSIBILITY_LIVE_REGION_POLITE"),
-                "controller test results must be exposed as accessibility live regions");
+        assertTrue(controllerTest.contains("R.layout.controller_test_activity"),
+                "controller test must inflate its resource-defined layout");
+        assertFalse(controllerTest.contains("setTextSize("),
+                "controller test must defer text sizing to the system theme");
+        assertFalse(controllerTest.contains("dp("),
+                "controller test must not calculate fixed pixel spacing");
         assertTrue(controllerTest.contains(
                         "getString(ControllerDisplayNames.buttonName(physical))"),
                 "controller test must resolve button resource IDs through the activity locale");
+
+        String controllerLayout = read(repo.resolve("res/layout/controller_test_activity.xml"));
+        assertTrue(controllerLayout.contains("<ScrollView"),
+                "controller test must scroll in landscape and at large font scales");
+        assertTrue(controllerLayout.contains("android:fillViewport=\"true\""),
+                "controller test scroll content must fill the viewport");
+        assertTrue(controllerLayout.contains("@string/done"),
+                "controller test must expose a visible focusable exit action");
+        assertTrue(controllerLayout.contains("android:labelFor="),
+                "controller test status labels must identify their dynamic values");
+        assertTrue(controllerLayout.contains("android:accessibilityLiveRegion=\"polite\""),
+                "controller test results must be exposed as accessibility live regions");
+        assertTrue(controllerLayout.contains("android:layoutDirection=\"locale\""),
+                "controller test layout must follow locale direction");
+        assertTrue(controllerLayout.contains("android:paddingStart="),
+                "controller test layout must use start padding");
+        assertTrue(controllerLayout.contains("android:paddingEnd="),
+                "controller test layout must use end padding");
+        assertFalse(controllerLayout.contains("paddingLeft"),
+                "controller test layout must not use physical left padding");
+        assertFalse(controllerLayout.contains("paddingRight"),
+                "controller test layout must not use physical right padding");
+        assertTrue(controllerLayout.contains("?android:attr/textAppearance"),
+                "controller test must use system text appearances that scale with font size");
 
         String preferences = read(repo.resolve("res/xml/main_preferences.xml"));
         assertTrue(preferences.contains("ControllerListPreference"),

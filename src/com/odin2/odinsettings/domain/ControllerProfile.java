@@ -7,15 +7,10 @@ import java.util.Objects;
 
 public final class ControllerProfile {
     public final String id;
-    public final String displayName;
-    public final String description;
     private final Map<ControllerButton, ControllerButton> mappings;
 
-    ControllerProfile(String id, String displayName, String description,
-            Map<ControllerButton, ControllerButton> mappings) {
+    ControllerProfile(String id, Map<ControllerButton, ControllerButton> mappings) {
         this.id = Objects.requireNonNull(id);
-        this.displayName = Objects.requireNonNull(displayName);
-        this.description = Objects.requireNonNull(description);
 
         EnumMap<ControllerButton, ControllerButton> copy =
                 new EnumMap<>(ControllerButton.class);

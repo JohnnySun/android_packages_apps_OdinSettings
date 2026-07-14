@@ -11,14 +11,10 @@ public final class ControllerProfiles {
 
     public static final ControllerProfile STANDARD = new ControllerProfile(
             STANDARD_ID,
-            "Standard (Xbox-style)",
-            "Uses Android's A/B/X/Y button identity.",
             identityMappings());
 
     public static final ControllerProfile FLIPPED_FACE = new ControllerProfile(
             FLIPPED_FACE_ID,
-            "Flipped face buttons",
-            "Swaps A with B and X with Y.",
             flippedFaceMappings());
 
     public static final List<ControllerProfile> ALL = Collections.unmodifiableList(

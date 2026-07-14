@@ -34,6 +34,9 @@ final class UiResourceContract {
             "background", "colorAccent", "fillColor", "foreground", "navigationBarColor",
             "statusBarColor", "textColor", "textColorHint", "textColorLink",
             "windowBackground"));
+    private static final Set<String> PHYSICAL_DIRECTION_ATTRIBUTES = new HashSet<>(Arrays.asList(
+            "layout_alignLeft", "layout_alignRight", "layout_marginLeft", "layout_marginRight",
+            "paddingLeft", "paddingRight"));
     private static final Pattern STRING_RESOURCE =
             Pattern.compile("@(?:android:)?string/[A-Za-z0-9_]+");
     private static final Pattern HEX_COLOR =
@@ -45,6 +48,10 @@ final class UiResourceContract {
             "Toast\\.makeText\\s*\\([^,]+,\\s*\"");
     private static final Pattern JAVA_FIXED_COLOR = Pattern.compile(
             "\\b(?:setTextColor|setBackgroundColor)\\s*\\(|\\bColor\\.[A-Z_]+\\b");
+    private static final Pattern XML_FIXED_DIMENSION = Pattern.compile(
+            "[0-9]+(?:\\.[0-9]+)?(?:dp|sp|px|pt|in|mm)");
+    private static final Pattern JAVA_FIXED_DIMENSION = Pattern.compile(
+            "\\bsetTextSize\\s*\\(|\\b(?:dp|sp)\\s*\\(\\s*[0-9]+");
     private static final Pattern FORCED_THEME = Pattern.compile(
             "forceDark|nightMode|setNightMode|setDefaultNightMode|setLocalNightMode|MODE_NIGHT|"
                     + "windowLightStatusBar|windowLightNavigationBar|\\bsetTheme\\s*\\(|"
@@ -62,8 +69,10 @@ final class UiResourceContract {
         List<String> violations = inspect(fixture);
         assertCategory(violations, "hardcoded-text:");
         assertCategory(violations, "fixed-color:");
+        assertCategory(violations, "fixed-dimension:");
         assertCategory(violations, "forced-theme:");
         assertCategory(violations, "locale-drift:");
+        assertCategory(violations, "rtl-layout:");
     }
 
     private static List<String> inspect(Path repo) {
@@ -75,6 +84,8 @@ final class UiResourceContract {
         inspectXmlTree(repo, manifest, violations);
         inspectXmlDirectory(repo, repo.resolve("res"), violations);
         inspectJavaDirectory(repo, repo.resolve("src"), violations);
+        inspectControllerDisplayMetadata(repo, violations);
+        inspectControllerTestLayout(repo, violations);
         return violations;
     }
 
@@ -228,6 +239,15 @@ final class UiResourceContract {
                     violations.add("fixed-color: " + relative(repo, path) + " "
                             + attribute.getNodeName() + "=" + value);
                 }
+                if (PHYSICAL_DIRECTION_ATTRIBUTES.contains(name)) {
+                    violations.add("rtl-layout: " + relative(repo, path) + " "
+                            + attribute.getNodeName() + "=" + value);
+                }
+                if (relative(repo, path).startsWith("res/layout/")
+                        && XML_FIXED_DIMENSION.matcher(value).matches()) {
+                    violations.add("fixed-dimension: " + relative(repo, path) + " "
+                            + attribute.getNodeName() + "=" + value);
+                }
             }
         }
     }
@@ -249,12 +269,53 @@ final class UiResourceContract {
                         || HEX_COLOR.matcher(source).find()) {
                     violations.add("fixed-color: " + relative);
                 }
+                if (JAVA_FIXED_DIMENSION.matcher(source).find()) {
+                    violations.add("fixed-dimension: " + relative);
+                }
                 if (FORCED_THEME.matcher(source).find()) {
                     violations.add("forced-theme: " + relative);
                 }
             });
         } catch (IOException exception) {
             throw new AssertionError("Cannot scan " + directory, exception);
+        }
+    }
+
+    private static void inspectControllerDisplayMetadata(Path repo, List<String> violations) {
+        for (String sourceFile : Arrays.asList(
+                "src/com/odin2/odinsettings/domain/ControllerButton.java",
+                "src/com/odin2/odinsettings/domain/ControllerProfile.java",
+                "src/com/odin2/odinsettings/domain/ControllerProfiles.java")) {
+            Path path = repo.resolve(sourceFile);
+            if (Files.isRegularFile(path) && (read(path).contains("displayName")
+                    || read(path).contains("description"))) {
+                violations.add("localized-controller-display-metadata: " + sourceFile);
+            }
+        }
+    }
+
+    private static void inspectControllerTestLayout(Path repo, List<String> violations) {
+        Path activity = repo.resolve("src/com/odin2/odinsettings/ControllerTestActivity.java");
+        if (!Files.isRegularFile(activity)) {
+            return;
+        }
+        Path layout = repo.resolve("res/layout/controller_test_activity.xml");
+        if (!Files.isRegularFile(layout)) {
+            violations.add("large-font: missing " + layout);
+            return;
+        }
+        String source = read(layout);
+        if (!source.contains("<ScrollView") || !source.contains("android:fillViewport=\"true\"")) {
+            violations.add("large-font: controller test must use a viewport-filling ScrollView");
+        }
+        if (!source.contains("android:layoutDirection=\"locale\"")) {
+            violations.add("rtl-layout: controller test must inherit locale layout direction");
+        }
+        if (!source.contains("android:paddingStart=") || !source.contains("android:paddingEnd=")) {
+            violations.add("rtl-layout: controller test must use start/end content padding");
+        }
+        if (!source.contains("?android:attr/textAppearance")) {
+            violations.add("large-font: controller test must use theme text appearances");
         }
     }
 
