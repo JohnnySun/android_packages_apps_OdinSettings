@@ -27,9 +27,10 @@
 
     <PreferenceCategory android:title="@string/hardware_controls_category">
         <Preference
-            android:enabled="false"
-            android:summary="@string/fan_control_summary"
-            android:title="@string/fan_control_title" />
+            android:key="fan_status"
+            android:selectable="false"
+            android:summary="@string/fan_status_unavailable_summary"
+            android:title="@string/fan_status_title" />
         <Preference
             android:enabled="false"
             android:summary="@string/calibration_summary"

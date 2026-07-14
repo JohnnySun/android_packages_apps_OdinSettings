@@ -8,6 +8,7 @@ import com.odin2.odinsettings.hardware.AdapterCapability;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
+import com.odin2.odinsettings.hardware.FanStatusRead;
 import com.odin2.odinsettings.hardware.HardwareAdapter;
 import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
@@ -29,6 +30,7 @@ public final class HostTestMain {
         capabilityGatePreventsUnsupportedCalls();
         reviewedAdapterCanReceiveRecognizedProfile();
         externalDisplayUsesTheSameIdentityAndCapabilityGates();
+        fanStatusResultCannotCarryPartialOrInvalidData();
         ResourceContractTest.verify();
         pass();
 
@@ -172,6 +174,47 @@ public final class HostTestMain {
         return new DeviceIdentity("Odin2_Mini", "kalama", "kalama", "QCS8550");
     }
 
+    private static void fanStatusResultCannotCarryPartialOrInvalidData() {
+        FanStatusRead available = FanStatusRead.available(1, 10000);
+        assertEquals(FanStatusRead.Code.AVAILABLE, available.code,
+                "available fan status code");
+        assertTrue(available.hasSnapshot(), "available fan status snapshot");
+        assertEquals(1, available.state, "available fan state");
+        assertEquals(10000, available.duty, "available fan duty");
+
+        for (FanStatusRead.Code code : new FanStatusRead.Code[] {
+                FanStatusRead.Code.UNSUPPORTED,
+                FanStatusRead.Code.UNAVAILABLE,
+                FanStatusRead.Code.MALFORMED,
+        }) {
+            FanStatusRead error = FanStatusRead.error(code);
+            assertEquals(code, error.code, "fan error code");
+            assertFalse(error.hasSnapshot(), "fan error must not carry a snapshot");
+            assertEquals(-1, error.state, "fan error state sentinel");
+            assertEquals(-1, error.duty, "fan error duty sentinel");
+        }
+
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                FanStatusRead.available(2, 10000);
+            }
+        }, "invalid fan state must be rejected");
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                FanStatusRead.available(1, -1);
+            }
+        }, "negative fan duty must be rejected");
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                FanStatusRead.error(FanStatusRead.Code.AVAILABLE);
+            }
+        }, "available code cannot be constructed without a snapshot");
+        pass();
+    }
+
     private static void assertEquals(Object expected, Object actual, String message) {
         if (!expected.equals(actual)) {
             throw new AssertionError(message + ": expected " + expected + " but got " + actual);
@@ -188,6 +231,15 @@ public final class HostTestMain {
         if (!value) {
             throw new AssertionError(message);
         }
+    }
+
+    private static void assertThrows(Runnable action, String message) {
+        try {
+            action.run();
+        } catch (IllegalArgumentException expected) {
+            return;
+        }
+        throw new AssertionError(message);
     }
 
     private static void pass() {

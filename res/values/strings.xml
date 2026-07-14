@@ -25,8 +25,12 @@
     <string name="external_display_available_summary">External display adapter available.</string>
     <string name="external_display_unavailable_summary">Unavailable until Android 16 display behavior is validated.</string>
     <string name="hardware_controls_category">Hardware controls</string>
-    <string name="fan_control_title">Fan control</string>
-    <string name="fan_control_summary">Unavailable until the thermal control path is validated.</string>
+    <string name="fan_status_title">Fan status</string>
+    <string name="fan_status_active_summary">Fan on. Raw duty: %1$d.</string>
+    <string name="fan_status_inactive_summary">Fan off. Raw duty: %1$d.</string>
+    <string name="fan_status_unsupported_summary">Fan status is unsupported on this hardware.</string>
+    <string name="fan_status_unavailable_summary">Fan status is currently unavailable.</string>
+    <string name="fan_status_malformed_summary">The fan returned an invalid status.</string>
     <string name="calibration_title">Joystick calibration</string>
     <string name="calibration_summary">Unavailable until calibration storage and restore behavior are validated.</string>
     <string name="controller_profile_standard">Standard (Xbox-style)</string>

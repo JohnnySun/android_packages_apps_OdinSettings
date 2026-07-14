@@ -27,6 +27,7 @@ final class ResourceContractTest {
         assertControllerLabelsAreLocalized(repo.resolve(
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
         assertHandheldActivityLayout(repo);
+        assertFanStatusIsReadOnly(repo);
     }
 
     private static void assertLocaleConfig(Path repo) {
@@ -193,6 +194,78 @@ final class ResourceContractTest {
                 "profile dialog list must receive visible controller focus");
         assertTrue(listPreference.contains("setSelection"),
                 "profile dialog must visibly select the checked row");
+    }
+
+    private static void assertFanStatusIsReadOnly(Path repo) {
+        Document preferences = parse(repo.resolve("res/xml/main_preferences.xml"));
+        NodeList rows = preferences.getElementsByTagName("Preference");
+        Element fanStatus = null;
+        for (int i = 0; i < rows.getLength(); i++) {
+            Element row = (Element) rows.item(i);
+            if ("fan_status".equals(row.getAttribute("android:key"))) {
+                fanStatus = row;
+                break;
+            }
+        }
+        assertTrue(fanStatus != null, "fan status row must exist");
+        assertEquals("false", fanStatus.getAttribute("android:selectable"),
+                "fan status row must be read-only");
+        assertFalse("false".equals(fanStatus.getAttribute("android:enabled")),
+                "fan status row must remain readable instead of disabled");
+
+        String activity = read(repo.resolve(
+                "src/com/odin2/odinsettings/MainSettingsActivity.java"));
+        assertTrue(activity.contains("protected void onResume()"),
+                "fan status must refresh when the settings screen resumes");
+        assertTrue(activity.contains("fanStatusReader.read()"),
+                "fan status must use the dedicated read-only reader");
+        assertFalse(activity.contains("fanStatus.setOnPreferenceClickListener"),
+                "fan status must not expose a click action");
+
+        String blueprint = read(repo.resolve("Android.bp"));
+        assertTrue(blueprint.contains("jni_libs: [\"libodinsettings_fan_status_jni\"]"),
+                "Odin Settings must package the fan status JNI bridge");
+        String jniModule = module(blueprint, "libodinsettings_fan_status_jni");
+        assertTrue(jniModule.contains("\"libayn_fan_status_core\""),
+                "fan status JNI must link the read-only core");
+        for (String forbidden : new String[] {
+                "libayn_fan_service_core", "libayn_fan_policy", "odinfand"}) {
+            assertFalse(jniModule.contains(forbidden),
+                    "fan status JNI must not link " + forbidden);
+        }
+
+        String nativeSource = read(repo.resolve("jni/fan_status_jni.cpp"));
+        for (String forbidden : new String[] {
+                "O_WRONLY", "O_RDWR", "chmod", "setprop", "SetProperty",
+                "SysfsWriter", "WriteStringToFile", "write("}) {
+            assertFalse(nativeSource.contains(forbidden),
+                    "fan status JNI must not expose " + forbidden);
+        }
+        assertTrue(nativeSource.contains("ro.product.device"),
+                "fan status JNI must pass the exact Android product identity");
+        assertTrue(nativeSource.contains("ro.vendor.retro.name"),
+                "fan status JNI must pass the exact stock retro identity");
+        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/state"),
+                "fan status JNI must use the exact observed state path");
+        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/duty"),
+                "fan status JNI must use the exact observed duty path");
+        assertFalse(nativeSource.contains("/sys/class/gpio5_pwm2/speed"),
+                "fan status JNI must not infer speed semantics");
+    }
+
+    private static String module(String blueprint, String name) {
+        String marker = "name: \"" + name + "\"";
+        int nameIndex = blueprint.indexOf(marker);
+        if (nameIndex < 0) {
+            throw new AssertionError("Missing Android.bp module " + name);
+        }
+        int start = blueprint.lastIndexOf("\n", nameIndex);
+        start = blueprint.lastIndexOf("\n", Math.max(0, start - 1));
+        int end = blueprint.indexOf("\n}", nameIndex);
+        if (end < 0) {
+            throw new AssertionError("Unterminated Android.bp module " + name);
+        }
+        return blueprint.substring(Math.max(0, start), end + 2);
     }
 
     private static Document parse(Path path) {

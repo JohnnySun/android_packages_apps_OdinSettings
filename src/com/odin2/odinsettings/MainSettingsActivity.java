@@ -13,8 +13,11 @@ import android.widget.ListView;
 
 import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
+import com.odin2.odinsettings.hardware.FanStatusRead;
+import com.odin2.odinsettings.hardware.FanStatusReader;
 import com.odin2.odinsettings.platform.AndroidDeviceIdentity;
 import com.odin2.odinsettings.platform.ControllerNavigation;
+import com.odin2.odinsettings.platform.NativeFanStatusReader;
 import com.odin2.odinsettings.policy.AccessDecision;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 
@@ -22,6 +25,8 @@ public final class MainSettingsActivity extends PreferenceActivity {
     private ListView preferenceList;
     private int lastFocusedPosition = ListView.INVALID_POSITION;
     private boolean controllerFocusActive;
+    private final FanStatusReader fanStatusReader = new NativeFanStatusReader();
+    private Preference fanStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,6 +35,8 @@ public final class MainSettingsActivity extends PreferenceActivity {
 
         Preference controllerTest = findPreference("controller_input_test");
         controllerTest.setIntent(new Intent(this, ControllerTestActivity.class));
+        fanStatus = findPreference("fan_status");
+        updateFanStatus();
 
         AccessDecision identity = new HardwareAccessPolicy().evaluate(
                 AndroidDeviceIdentity.current());
@@ -47,6 +54,35 @@ public final class MainSettingsActivity extends PreferenceActivity {
 
         configureControllerFocus();
         focusFirstEnabledPreference();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateFanStatus();
+    }
+
+    private void updateFanStatus() {
+        if (fanStatus == null) {
+            return;
+        }
+        FanStatusRead status = fanStatusReader.read();
+        switch (status.code) {
+            case AVAILABLE:
+                fanStatus.setSummary(status.state == 1
+                        ? getString(R.string.fan_status_active_summary, status.duty)
+                        : getString(R.string.fan_status_inactive_summary, status.duty));
+                break;
+            case UNSUPPORTED:
+                fanStatus.setSummary(R.string.fan_status_unsupported_summary);
+                break;
+            case UNAVAILABLE:
+                fanStatus.setSummary(R.string.fan_status_unavailable_summary);
+                break;
+            case MALFORMED:
+                fanStatus.setSummary(R.string.fan_status_malformed_summary);
+                break;
+        }
     }
 
     @Override

@@ -5,7 +5,21 @@ android_app {
     certificate: "platform",
     privileged: true,
     platform_apis: true,
+    jni_libs: ["libodinsettings_fan_status_jni"],
     manifest: "AndroidManifest.xml",
+}
+
+cc_library_shared {
+    name: "libodinsettings_fan_status_jni",
+    srcs: ["jni/fan_status_jni.cpp"],
+    static_libs: ["libayn_fan_status_core"],
+    shared_libs: ["libbase"],
+    header_libs: ["jni_headers"],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
 }
 
 java_test_host {
