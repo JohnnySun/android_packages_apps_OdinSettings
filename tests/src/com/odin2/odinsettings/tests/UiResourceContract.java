@@ -28,7 +28,7 @@ final class UiResourceContract {
     private static final String SETTINGS_THEME =
             "@android:style/Theme.DeviceDefault.Settings";
     private static final String NIGHT_SETTINGS_THEME =
-            "@android:style/Theme.DeviceDefault.Settings";
+            "@android:style/Theme.DeviceDefault";
     private static final Set<String> SUPPORTED_LOCALES = new HashSet<>(Arrays.asList(
             "en", "zh-CN", "zh-TW"));
     private static final Set<String> VISIBLE_TEXT_ATTRIBUTES = new HashSet<>(Arrays.asList(
