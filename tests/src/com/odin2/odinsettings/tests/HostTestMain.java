@@ -1,6 +1,7 @@
 package com.odin2.odinsettings.tests;
 
 import com.odin2.odinsettings.display.ExternalDisplayPolicy;
+import com.odin2.odinsettings.domain.ControllerAxisNormalizer;
 import com.odin2.odinsettings.domain.ControllerButton;
 import com.odin2.odinsettings.domain.ControllerProfile;
 import com.odin2.odinsettings.domain.ControllerProfiles;
@@ -38,6 +39,8 @@ public final class HostTestMain {
         standardProfileIsIdentity();
         flippedProfileSwapsOnlyFaceButtons();
         unknownStoredProfileFallsBackToStandard();
+        controllerAxesNormalizePublishedGamepadRanges();
+        controllerAxesClampAndHonorFlatZones();
         identityPolicyAcceptsOnlyProvenDeviceProductPairs();
         unknownDeviceNeverReachesAdapter();
         recognizedDeviceStillFailsClosedWithoutAdapter();
@@ -86,6 +89,38 @@ public final class HostTestMain {
         assertEquals(ControllerProfiles.STANDARD,
                 ControllerProfiles.findOrDefault("corrupt-or-future-value"),
                 "unknown preview profile fallback");
+        pass();
+    }
+
+    private static void controllerAxesNormalizePublishedGamepadRanges() {
+        assertFloatEquals(-1.0f,
+                ControllerAxisNormalizer.centered(-32768.0f, -32768.0f, 32768.0f, 0.0f),
+                "centered axis minimum");
+        assertFloatEquals(0.0f,
+                ControllerAxisNormalizer.centered(0.0f, -32768.0f, 32768.0f, 0.0f),
+                "centered axis neutral");
+        assertFloatEquals(1.0f,
+                ControllerAxisNormalizer.centered(32768.0f, -32768.0f, 32768.0f, 0.0f),
+                "centered axis maximum");
+        assertFloatEquals(0.5f,
+                ControllerAxisNormalizer.trigger(0x308, 0.0f, 0x610, 0.0f),
+                "published trigger midpoint");
+        pass();
+    }
+
+    private static void controllerAxesClampAndHonorFlatZones() {
+        assertFloatEquals(0.0f,
+                ControllerAxisNormalizer.centered(500.0f, -32768.0f, 32768.0f, 1000.0f),
+                "centered axis flat zone");
+        assertFloatEquals(0.0f,
+                ControllerAxisNormalizer.trigger(25.0f, 0.0f, 1552.0f, 50.0f),
+                "trigger flat zone");
+        assertFloatEquals(1.0f,
+                ControllerAxisNormalizer.trigger(2000.0f, 0.0f, 1552.0f, 0.0f),
+                "trigger clamps high");
+        assertFloatEquals(-1.0f,
+                ControllerAxisNormalizer.centered(-40000.0f, -32768.0f, 32768.0f, 0.0f),
+                "centered axis clamps low");
         pass();
     }
 
@@ -544,6 +579,12 @@ public final class HostTestMain {
     private static void assertFalse(boolean value, String message) {
         if (value) {
             throw new AssertionError(message);
+        }
+    }
+
+    private static void assertFloatEquals(float expected, float actual, String message) {
+        if (Math.abs(expected - actual) > 0.0001f) {
+            throw new AssertionError(message + ": expected " + expected + " but got " + actual);
         }
     }
 

@@ -40,6 +40,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="?android:attr/listPreferredItemPaddingStart"
+                android:labelFor="@id/controller_test_device_value"
+                android:text="@string/controller_device_label"
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+
+            <TextView
+                android:id="@+id/controller_test_device_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/no_controller_detected"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="?android:attr/listPreferredItemPaddingStart"
                 android:labelFor="@id/controller_test_profile_value"
                 android:text="@string/preview_profile_label"
                 android:textAppearance="?android:attr/textAppearanceSmall" />
@@ -79,6 +94,51 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/no_button_detected"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="?android:attr/listPreferredItemPaddingStart"
+                android:labelFor="@id/controller_test_left_stick_value"
+                android:text="@string/controller_left_stick_label"
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+
+            <TextView
+                android:id="@+id/controller_test_left_stick_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/controller_axis_neutral_value"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="?android:attr/listPreferredItemPaddingStart"
+                android:labelFor="@id/controller_test_right_stick_value"
+                android:text="@string/controller_right_stick_label"
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+
+            <TextView
+                android:id="@+id/controller_test_right_stick_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/controller_axis_neutral_value"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="?android:attr/listPreferredItemPaddingStart"
+                android:labelFor="@id/controller_test_trigger_value"
+                android:text="@string/controller_triggers_label"
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+
+            <TextView
+                android:id="@+id/controller_test_trigger_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/controller_trigger_neutral_value"
                 android:textAppearance="?android:attr/textAppearanceMedium" />
         </LinearLayout>
     </LinearLayout>

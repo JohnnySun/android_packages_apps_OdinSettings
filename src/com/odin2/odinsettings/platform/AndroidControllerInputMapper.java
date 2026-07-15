@@ -33,6 +33,8 @@ public final class AndroidControllerInputMapper {
                 return ControllerButton.SELECT;
             case KeyEvent.KEYCODE_BUTTON_MODE:
                 return ControllerButton.HOME;
+            case KeyEvent.KEYCODE_F1:
+                return ControllerButton.BACK;
             case KeyEvent.KEYCODE_DPAD_UP:
                 return ControllerButton.DPAD_UP;
             case KeyEvent.KEYCODE_DPAD_DOWN:

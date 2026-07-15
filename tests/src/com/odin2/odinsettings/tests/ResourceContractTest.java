@@ -143,10 +143,36 @@ final class ResourceContractTest {
                 "controller test must provide visible up navigation");
         assertTrue(controllerTest.contains("android.R.id.home"),
                 "controller test must handle the up affordance");
-        assertTrue(controllerTest.contains("ControllerNavigation.isBack"),
-                "controller test must remain escapable with gamepad B");
-        assertTrue(controllerTest.contains("ControllerNavigation.translateConfirm"),
-                "controller test must use gamepad A as focused-control activation");
+        assertTrue(controllerTest.contains("InputManager.InputDeviceListener"),
+                "controller test must track an already-published Android input device");
+        assertTrue(controllerTest.contains("0x2020") && controllerTest.contains("0x3001"),
+                "controller test must identify the published Odin2 gamepad");
+        assertTrue(controllerTest.contains("dispatchGenericMotionEvent"),
+                "controller test must receive joystick and trigger motion events");
+        assertTrue(controllerTest.contains(
+                        "rightX = centeredAxis(event, MotionEvent.AXIS_Z)")
+                        && controllerTest.contains(
+                                "rightY = centeredAxis(event, MotionEvent.AXIS_RZ)")
+                        && controllerTest.contains(
+                                "leftTrigger = triggerAxis(event, MotionEvent.AXIS_LTRIGGER)")
+                        && controllerTest.contains(
+                                "rightTrigger = triggerAxis(event, MotionEvent.AXIS_RTRIGGER)"),
+                "controller test must read the post-keylayout Odin2 stick and trigger axes");
+        String inputMapper = read(repo.resolve(
+                "src/com/odin2/odinsettings/platform/AndroidControllerInputMapper.java"));
+        assertTrue(inputMapper.contains("KeyEvent.KEYCODE_F1")
+                        && inputMapper.contains("ControllerButton.BACK"),
+                "controller test must capture the published BTN_BACK F1 key");
+        assertTrue(controllerTest.contains("content.requestFocus()"),
+                "controller test must start in capture focus instead of focusing Done");
+        assertTrue(controllerTest.contains(
+                        "physical == ControllerButton.A && done.hasFocus()"),
+                "gamepad A may activate Done only after explicit D-pad focus navigation");
+        assertTrue(controllerTest.indexOf("showButton(physical)")
+                        < controllerTest.indexOf("physical == ControllerButton.A && done.hasFocus()"),
+                "controller test must record gamepad A before any focused Done activation");
+        assertFalse(controllerTest.contains("ControllerNavigation.isBack"),
+                "controller test must capture gamepad B instead of closing");
         assertTrue(controllerTest.contains("R.layout.controller_test_activity"),
                 "controller test must inflate its resource-defined layout");
         assertFalse(controllerTest.contains("setTextSize("),

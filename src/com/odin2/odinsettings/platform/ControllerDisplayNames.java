@@ -41,6 +41,8 @@ public final class ControllerDisplayNames {
                 return R.string.controller_button_select;
             case HOME:
                 return R.string.controller_button_home;
+            case BACK:
+                return R.string.controller_button_back;
             case DPAD_UP:
                 return R.string.controller_button_dpad_up;
             case DPAD_DOWN:
