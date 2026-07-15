@@ -6,11 +6,11 @@ public enum FanActualState {
     SPORT,
     UNRECOGNIZED;
 
-    static FanActualState classify(int state, int pwmHighTimeNs) {
-        if (state == 0) {
+    static FanActualState classify(int state, int pwmHighTimeNs, int tachPulsesTimes300) {
+        if (state == 0 && pwmHighTimeNs == 10000 && tachPulsesTimes300 == 0) {
             return OFF;
         }
-        if (state != 1) {
+        if (state != 1 || tachPulsesTimes300 <= 0) {
             return UNRECOGNIZED;
         }
         if (pwmHighTimeNs == 5000) {

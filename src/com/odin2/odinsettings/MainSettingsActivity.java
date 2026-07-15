@@ -2,6 +2,8 @@ package com.odin2.odinsettings;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.view.KeyEvent;
@@ -14,23 +16,40 @@ import android.widget.ListView;
 import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
 import com.odin2.odinsettings.hardware.FanActualState;
+import com.odin2.odinsettings.hardware.FanApplyDispatcher;
 import com.odin2.odinsettings.hardware.FanControlResult;
 import com.odin2.odinsettings.hardware.FanController;
 import com.odin2.odinsettings.hardware.FanMode;
 import com.odin2.odinsettings.platform.AndroidDeviceIdentity;
 import com.odin2.odinsettings.platform.ControllerNavigation;
-import com.odin2.odinsettings.platform.NativeFanController;
+import com.odin2.odinsettings.platform.AidlFanController;
 import com.odin2.odinsettings.policy.AccessDecision;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.widget.ControllerListPreference;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+
 public final class MainSettingsActivity extends PreferenceActivity {
     private static final String STATE_REQUESTED_FAN_MODE = "requested_fan_mode";
+    private static final ExecutorService FAN_WORKER = Executors.newSingleThreadExecutor();
 
     private ListView preferenceList;
     private int lastFocusedPosition = ListView.INVALID_POSITION;
     private boolean controllerFocusActive;
-    private final FanController fanController = new NativeFanController();
+    private final FanController fanController = AidlFanController.getInstance();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final FanApplyDispatcher fanApplyDispatcher = new FanApplyDispatcher(
+            FAN_WORKER, new Executor() {
+                @Override
+                public void execute(Runnable command) {
+                    if (!mainHandler.post(command)) {
+                        throw new RejectedExecutionException("Main thread is shutting down");
+                    }
+                }
+            });
     private ControllerListPreference fanModePreference;
     private FanMode lastRequestedMode;
 
@@ -50,8 +69,6 @@ public final class MainSettingsActivity extends PreferenceActivity {
                         return applyFanMode(String.valueOf(newValue));
                     }
                 });
-        updateFanStatus();
-
         AccessDecision identity = new HardwareAccessPolicy().evaluate(
                 AndroidDeviceIdentity.current());
         AdapterStatus adapter = new DisabledHardwareAdapter().status();
@@ -77,12 +94,24 @@ public final class MainSettingsActivity extends PreferenceActivity {
     }
 
     @Override
+    protected void onStop() {
+        fanApplyDispatcher.invalidateCallbacks();
+        super.onStop();
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (lastRequestedMode != null) {
             outState.putString(STATE_REQUESTED_FAN_MODE,
                     lastRequestedMode.preferenceValue);
         }
         super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onDestroy() {
+        fanApplyDispatcher.close();
+        super.onDestroy();
     }
 
     private void restoreRequestedFanMode(Bundle savedInstanceState) {
@@ -104,7 +133,22 @@ public final class MainSettingsActivity extends PreferenceActivity {
         if (fanModePreference == null) {
             return;
         }
-        renderFanStatus(fanController.read());
+        fanModePreference.setEnabled(false);
+        boolean accepted = fanApplyDispatcher.submitRead(
+                fanController, new FanApplyDispatcher.Callback() {
+            @Override
+            public void onComplete(FanControlResult result) {
+                if (!isUiStale()) {
+                    fanModePreference.setEnabled(true);
+                    renderFanStatus(result);
+                }
+            }
+        });
+        if (!accepted) {
+            fanModePreference.setEnabled(true);
+            renderFanStatus(FanControlResult.error(
+                    FanControlResult.Code.UNAVAILABLE, lastRequestedMode));
+        }
     }
 
     private boolean applyFanMode(String value) {
@@ -116,10 +160,30 @@ public final class MainSettingsActivity extends PreferenceActivity {
                     FanControlResult.Code.INVALID_MODE, lastRequestedMode));
             return false;
         }
-        lastRequestedMode = requestedMode;
-        FanControlResult result = fanController.apply(requestedMode);
-        renderFanStatus(result);
-        return result.hasSnapshot();
+        fanModePreference.setEnabled(false);
+        boolean accepted = fanApplyDispatcher.submit(fanController, requestedMode,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        if (isUiStale()) {
+                            return;
+                        }
+                        fanModePreference.setEnabled(true);
+                        renderFanStatus(result);
+                    }
+                });
+        if (accepted) {
+            lastRequestedMode = requestedMode;
+        } else {
+            fanModePreference.setEnabled(true);
+            renderFanStatus(FanControlResult.error(
+                    FanControlResult.Code.UNAVAILABLE, lastRequestedMode));
+        }
+        return false;
+    }
+
+    private boolean isUiStale() {
+        return isFinishing() || isDestroyed();
     }
 
     private void renderFanStatus(FanControlResult status) {

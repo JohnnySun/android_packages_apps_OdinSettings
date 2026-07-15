@@ -9,15 +9,27 @@ import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
 import com.odin2.odinsettings.hardware.FanActualState;
+import com.odin2.odinsettings.hardware.FanApplyDispatcher;
 import com.odin2.odinsettings.hardware.FanControlResult;
+import com.odin2.odinsettings.hardware.FanController;
 import com.odin2.odinsettings.hardware.FanMode;
+import com.odin2.odinsettings.hardware.FanResponseMapper;
+import com.odin2.odinsettings.hardware.FanServiceConnection;
 import com.odin2.odinsettings.hardware.HardwareAdapter;
 import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.service.ControllerProfileCoordinator;
 import com.odin2.odinsettings.service.ExternalDisplayCoordinator;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public final class HostTestMain {
     private static int tests;
@@ -35,6 +47,12 @@ public final class HostTestMain {
         fanModesAreStrictlyAllowlisted();
         fanStatusClassifiesActualStateTruthfully();
         fanControlErrorsCannotCarryPartialData();
+        fanResponseMappingRequiresACompleteConfirmedSnapshot();
+        fanReadAndWriteDispatchSeriallyAndReturnOnMainExecutor();
+        fanDispatcherSuppressesLifecycleStaleCallbacks();
+        fanConnectionRetriesReadOnceAfterRemoteFailure();
+        fanConnectionNeverRetriesSetMode();
+        fanConnectionClearsTheDeadCachedService();
         ResourceContractTest.verify();
         pass();
 
@@ -195,19 +213,29 @@ public final class HostTestMain {
     private static void fanStatusClassifiesActualStateTruthfully() {
         FanControlResult offWithCachedHighTime =
                 FanControlResult.available(FanMode.OFF, 0, 25000, 3300);
-        assertEquals(FanActualState.OFF, offWithCachedHighTime.actualState,
-                "state zero is actually off despite cached values");
+        assertEquals(FanActualState.UNRECOGNIZED, offWithCachedHighTime.actualState,
+                "off requires exact baseline high-time and zero tach");
         assertEquals(25000, offWithCachedHighTime.pwmHighTimeNs,
                 "off snapshot preserves stored high-time");
         assertEquals(3300, offWithCachedHighTime.tachPulsesTimes300,
                 "tach remains pulses times 300");
 
+        assertEquals(FanActualState.OFF,
+                FanControlResult.available(FanMode.OFF, 0, 10000, 0).actualState,
+                "exact off actual state");
+
         assertEquals(FanActualState.QUIET,
                 FanControlResult.available(FanMode.QUIET, 1, 5000, 1200).actualState,
                 "quiet actual state");
+        assertEquals(FanActualState.UNRECOGNIZED,
+                FanControlResult.available(FanMode.QUIET, 1, 5000, 0).actualState,
+                "quiet state and high-time without tach must not claim quiet");
         assertEquals(FanActualState.SPORT,
                 FanControlResult.available(FanMode.SPORT, 1, 25000, 3300).actualState,
                 "sport actual state");
+        assertEquals(FanActualState.UNRECOGNIZED,
+                FanControlResult.available(FanMode.SPORT, 1, 25000, 0).actualState,
+                "sport state and high-time without tach must not claim sport");
         assertEquals(FanActualState.UNRECOGNIZED,
                 FanControlResult.available(null, 1, 10000, 1800).actualState,
                 "unknown enabled high-time must not invent a mode");
@@ -262,6 +290,251 @@ public final class HostTestMain {
         pass();
     }
 
+    private static void fanResponseMappingRequiresACompleteConfirmedSnapshot() {
+        FanControlResult read = FanResponseMapper.map(
+                FanResponseMapper.RESULT_OK, FanMode.QUIET.serviceValue,
+                1, 5000, 1200, null);
+        assertEquals(FanActualState.QUIET, read.actualState,
+                "complete read snapshot maps to quiet");
+        assertTrue(read.requestedMode == null,
+                "status reads must not invent a requested mode");
+
+        FanControlResult write = FanResponseMapper.map(
+                FanResponseMapper.RESULT_OK, FanMode.SPORT.serviceValue,
+                1, 25000, 3300, FanMode.SPORT);
+        assertEquals(FanMode.SPORT, write.requestedMode,
+                "confirmed write preserves requested mode");
+
+        assertEquals(FanControlResult.Code.MALFORMED,
+                FanResponseMapper.map(FanResponseMapper.RESULT_OK,
+                        FanMode.QUIET.serviceValue, 1, 5000, -1, null).code,
+                "partial success snapshot must be rejected");
+        assertEquals(FanControlResult.Code.MALFORMED,
+                FanResponseMapper.map(FanResponseMapper.RESULT_OK,
+                        FanMode.QUIET.serviceValue, 1, 25000, 3300, null).code,
+                "mode and snapshot mismatch must be rejected");
+        assertEquals(FanControlResult.Code.MALFORMED,
+                FanResponseMapper.map(FanResponseMapper.RESULT_OK,
+                        FanMode.QUIET.serviceValue, 1, 5000, 1200, FanMode.SPORT).code,
+                "write response for a different mode must be rejected");
+        assertEquals(FanControlResult.Code.MALFORMED,
+                FanResponseMapper.map(FanResponseMapper.RESULT_IO_ERROR,
+                        FanMode.QUIET.serviceValue, 1, 5000, 1200, FanMode.QUIET).code,
+                "error response carrying a snapshot must be rejected");
+        assertEquals(FanControlResult.Code.MALFORMED,
+                FanResponseMapper.map(FanResponseMapper.RESULT_IO_ERROR,
+                        FanMode.QUIET.serviceValue, -1, -1, -1, FanMode.SPORT).code,
+                "write error for a different mode must be rejected");
+        assertEquals(FanControlResult.Code.UNAVAILABLE,
+                FanResponseMapper.map(FanResponseMapper.RESULT_IO_ERROR,
+                        FanMode.OFF.serviceValue, -1, -1, -1, null).code,
+                "status I/O failure maps to unavailable");
+        assertEquals(FanControlResult.Code.WRITE_FAILED,
+                FanResponseMapper.map(FanResponseMapper.RESULT_IO_ERROR,
+                        FanMode.QUIET.serviceValue, -1, -1, -1, FanMode.QUIET).code,
+                "setMode I/O failure maps to write failed");
+        assertEquals(FanControlResult.Code.READBACK_MISMATCH,
+                FanResponseMapper.map(FanResponseMapper.RESULT_TACH_TIMEOUT,
+                        FanMode.SPORT.serviceValue, -1, -1, -1, FanMode.SPORT).code,
+                "tach timeout maps to a snapshot-free readback error");
+        pass();
+    }
+
+    private static void fanReadAndWriteDispatchSeriallyAndReturnOnMainExecutor() {
+        ManualExecutorService worker = new ManualExecutorService();
+        ManualExecutor main = new ManualExecutor();
+        RecordingFanController controller = new RecordingFanController();
+        FanApplyDispatcher dispatcher = new FanApplyDispatcher(worker, main);
+        List<String> callbacks = new ArrayList<>();
+
+        assertTrue(dispatcher.submitRead(controller,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        callbacks.add("read:" + result.actualState.name());
+                    }
+                }), "fan read must be accepted");
+        assertTrue(dispatcher.submit(controller, FanMode.QUIET,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        callbacks.add("write:" + result.actualState.name());
+                    }
+                }), "fan write must queue behind the read");
+        assertEquals(List.of(), controller.operations,
+                "Binder operations must not run in the submit callback");
+
+        worker.runNext();
+        assertEquals(List.of("read"), controller.operations,
+                "read must execute first on the single worker");
+        worker.runNext();
+        assertEquals(List.of("read", "write:quiet"), controller.operations,
+                "write must execute after read on the same worker");
+        assertEquals(List.of(), callbacks,
+                "fan results must wait for the main executor");
+
+        main.runNext();
+        main.runNext();
+        assertEquals(List.of("read:OFF", "write:QUIET"), callbacks,
+                "callbacks must preserve serialized operation order");
+        assertFalse(dispatcher.isPending(),
+                "main delivery must clear all pending requests");
+        dispatcher.close();
+        pass();
+    }
+
+    private static void fanDispatcherSuppressesLifecycleStaleCallbacks() {
+        ManualExecutorService worker = new ManualExecutorService();
+        ManualExecutor main = new ManualExecutor();
+        RecordingFanController controller = new RecordingFanController();
+        FanApplyDispatcher dispatcher = new FanApplyDispatcher(worker, main);
+        final int[] callbackCalls = {0};
+
+        assertTrue(dispatcher.submit(controller, FanMode.SPORT,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        callbackCalls[0] += 1;
+                    }
+                }), "fan request before close must be accepted");
+        worker.runNext();
+        assertEquals(1, main.size(), "completed work must queue its UI callback");
+        dispatcher.close();
+        assertFalse(worker.shutdown,
+                "closing one lifecycle must preserve the process worker");
+        assertFalse(worker.shutdownNow,
+                "close must not interrupt an accepted fan transaction");
+        main.runNext();
+        assertEquals(0, callbackCalls[0],
+                "closed lifecycle must suppress an already queued UI result");
+
+        FanApplyDispatcher closingBeforeRun = new FanApplyDispatcher(worker, main);
+        assertTrue(closingBeforeRun.submit(controller, FanMode.QUIET,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        callbackCalls[0] += 1;
+                    }
+                }), "write accepted before close must remain queued");
+        closingBeforeRun.close();
+        worker.runNext();
+        assertEquals(List.of("write:sport", "write:quiet"), controller.operations,
+                "accepted write must finish after its UI lifecycle closes");
+        assertEquals(0, main.size(),
+                "closed lifecycle must not enqueue a new stale callback");
+        assertEquals(0, callbackCalls[0],
+                "closed lifecycle callback must remain suppressed");
+
+        FanApplyDispatcher resumed = new FanApplyDispatcher(worker, main);
+        assertTrue(resumed.submit(controller, FanMode.SPORT,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        callbackCalls[0] += 1;
+                    }
+                }), "fan request before lifecycle invalidation must be accepted");
+        resumed.invalidateCallbacks();
+        assertTrue(resumed.submitRead(controller,
+                new FanApplyDispatcher.Callback() {
+                    @Override
+                    public void onComplete(FanControlResult result) {
+                        callbackCalls[0] += 10;
+                    }
+                }), "new lifecycle read must be accepted after invalidation");
+        worker.runNext();
+        worker.runNext();
+        assertEquals(List.of("write:sport", "write:quiet", "write:sport", "read"),
+                controller.operations,
+                "invalidation must not interrupt accepted work or reorder the fresh read");
+        assertEquals(1, main.size(),
+                "only the fresh lifecycle callback may reach the main executor");
+        main.runNext();
+        assertEquals(10, callbackCalls[0],
+                "fresh lifecycle callback must be delivered after stale suppression");
+        assertFalse(resumed.isPending(),
+                "stale and fresh operations must both clear pending state");
+        resumed.close();
+        pass();
+    }
+
+    private static void fanConnectionRetriesReadOnceAfterRemoteFailure() {
+        FakeFanConnector connector = new FakeFanConnector();
+        FakeFanService failed = FakeFanService.failingRead();
+        FakeFanService recovered = FakeFanService.available(FanMode.QUIET);
+        connector.add(failed);
+        connector.add(recovered);
+        FanServiceConnection<FakeFanService> connection =
+                new FanServiceConnection<>(connector);
+
+        FanControlResult result = connection.read(new FakeReadCall());
+
+        assertEquals(FanActualState.QUIET, result.actualState,
+                "one reacquire may recover a status read");
+        assertEquals(2, connector.connectCalls,
+                "status read must reacquire at most once");
+        assertEquals(1, failed.readCalls, "failed status call count");
+        assertEquals(1, recovered.readCalls, "reacquired status call count");
+
+        FakeFanConnector cappedConnector = new FakeFanConnector();
+        FakeFanService firstFailure = FakeFanService.failingRead();
+        FakeFanService secondFailure = FakeFanService.failingRead();
+        FakeFanService forbiddenThird = FakeFanService.available(FanMode.SPORT);
+        cappedConnector.add(firstFailure);
+        cappedConnector.add(secondFailure);
+        cappedConnector.add(forbiddenThird);
+        FanControlResult cappedResult = new FanServiceConnection<>(cappedConnector)
+                .read(new FakeReadCall());
+        assertEquals(FanControlResult.Code.UNAVAILABLE, cappedResult.code,
+                "second status failure must exhaust the retry budget");
+        assertEquals(2, cappedConnector.connectCalls,
+                "status read must stop after one reacquire");
+        assertEquals(0, forbiddenThird.readCalls,
+                "status read must never attempt a second reacquire");
+        pass();
+    }
+
+    private static void fanConnectionNeverRetriesSetMode() {
+        FakeFanConnector connector = new FakeFanConnector();
+        FakeFanService ambiguous = FakeFanService.failingWrite();
+        FakeFanService mustNotRun = FakeFanService.available(FanMode.SPORT);
+        connector.add(ambiguous);
+        connector.add(mustNotRun);
+        FanServiceConnection<FakeFanService> connection =
+                new FanServiceConnection<>(connector);
+
+        FanControlResult result = connection.write(
+                FanMode.SPORT, new FakeWriteCall(FanMode.SPORT));
+
+        assertEquals(FanControlResult.Code.UNAVAILABLE, result.code,
+                "ambiguous write failure must be reported without retry");
+        assertEquals(1, connector.connectCalls,
+                "setMode must never reacquire and retry");
+        assertEquals(1, ambiguous.writeCalls, "ambiguous setMode call count");
+        assertEquals(0, mustNotRun.writeCalls, "replacement service must not receive setMode");
+        pass();
+    }
+
+    private static void fanConnectionClearsTheDeadCachedService() {
+        FakeFanConnector connector = new FakeFanConnector();
+        FakeFanService first = FakeFanService.available(FanMode.OFF);
+        FakeFanService second = FakeFanService.available(FanMode.SPORT);
+        connector.add(first);
+        connector.add(second);
+        FanServiceConnection<FakeFanService> connection =
+                new FanServiceConnection<>(connector);
+
+        assertEquals(FanActualState.OFF,
+                connection.read(new FakeReadCall()).actualState,
+                "first cached service result");
+        connector.die(first);
+        assertEquals(FanActualState.SPORT,
+                connection.read(new FakeReadCall()).actualState,
+                "death recipient must force a fresh service lookup");
+        assertEquals(2, connector.connectCalls,
+                "dead cached service must not be reused");
+        pass();
+    }
+
     private static void assertEquals(Object expected, Object actual, String message) {
         if (!expected.equals(actual)) {
             throw new AssertionError(message + ": expected " + expected + " but got " + actual);
@@ -291,6 +564,200 @@ public final class HostTestMain {
 
     private static void pass() {
         tests += 1;
+    }
+
+    private static final class RecordingFanController implements FanController {
+        private final List<String> operations = new ArrayList<>();
+
+        @Override
+        public FanControlResult read() {
+            operations.add("read");
+            return FanControlResult.available(null, 0, 10000, 0);
+        }
+
+        @Override
+        public FanControlResult apply(FanMode mode) {
+            operations.add("write:" + mode.preferenceValue);
+            int highTime = mode == FanMode.QUIET ? 5000 : 25000;
+            return FanControlResult.available(mode, 1, highTime, 1800);
+        }
+    }
+
+    private static final class FakeFanService {
+        private final FanMode mode;
+        private final boolean failRead;
+        private final boolean failWrite;
+        private int readCalls;
+        private int writeCalls;
+
+        private FakeFanService(FanMode mode, boolean failRead, boolean failWrite) {
+            this.mode = mode;
+            this.failRead = failRead;
+            this.failWrite = failWrite;
+        }
+
+        static FakeFanService available(FanMode mode) {
+            return new FakeFanService(mode, false, false);
+        }
+
+        static FakeFanService failingRead() {
+            return new FakeFanService(FanMode.OFF, true, false);
+        }
+
+        static FakeFanService failingWrite() {
+            return new FakeFanService(FanMode.OFF, false, true);
+        }
+
+        FanControlResult read() throws FanServiceConnection.RemoteFailure {
+            readCalls += 1;
+            if (failRead) {
+                throw new FanServiceConnection.RemoteFailure("read failed");
+            }
+            return confirmed(mode, null);
+        }
+
+        FanControlResult write(FanMode requestedMode)
+                throws FanServiceConnection.RemoteFailure {
+            writeCalls += 1;
+            if (failWrite) {
+                throw new FanServiceConnection.RemoteFailure("write outcome unknown");
+            }
+            return confirmed(requestedMode, requestedMode);
+        }
+
+        private static FanControlResult confirmed(FanMode actualMode, FanMode requestedMode) {
+            switch (actualMode) {
+                case OFF:
+                    return FanControlResult.available(requestedMode, 0, 10000, 0);
+                case QUIET:
+                    return FanControlResult.available(requestedMode, 1, 5000, 1200);
+                case SPORT:
+                    return FanControlResult.available(requestedMode, 1, 25000, 3300);
+            }
+            throw new IllegalArgumentException("Unknown fake fan mode");
+        }
+    }
+
+    private static final class FakeFanConnector
+            implements FanServiceConnection.Connector<FakeFanService> {
+        private final Queue<FakeFanService> services = new ArrayDeque<>();
+        private FanServiceConnection.DeathListener<FakeFanService> deathListener;
+        private int connectCalls;
+
+        void add(FakeFanService service) {
+            services.add(service);
+        }
+
+        void die(FakeFanService service) {
+            if (deathListener == null) {
+                throw new AssertionError("No registered death listener");
+            }
+            deathListener.onServiceDied(service);
+        }
+
+        @Override
+        public FakeFanService connect(
+                FanServiceConnection.DeathListener<FakeFanService> listener) {
+            connectCalls += 1;
+            deathListener = listener;
+            return services.poll();
+        }
+    }
+
+    private static final class FakeReadCall
+            implements FanServiceConnection.Call<FakeFanService> {
+        @Override
+        public FanControlResult call(FakeFanService service)
+                throws FanServiceConnection.RemoteFailure {
+            return service.read();
+        }
+    }
+
+    private static final class FakeWriteCall
+            implements FanServiceConnection.Call<FakeFanService> {
+        private final FanMode requestedMode;
+
+        FakeWriteCall(FanMode requestedMode) {
+            this.requestedMode = requestedMode;
+        }
+
+        @Override
+        public FanControlResult call(FakeFanService service)
+                throws FanServiceConnection.RemoteFailure {
+            return service.write(requestedMode);
+        }
+    }
+
+    private static final class ManualExecutor implements Executor {
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+
+        @Override
+        public void execute(Runnable command) {
+            tasks.add(command);
+        }
+
+        void runNext() {
+            Runnable task = tasks.poll();
+            if (task == null) {
+                throw new AssertionError("No queued executor task");
+            }
+            task.run();
+        }
+
+        int size() {
+            return tasks.size();
+        }
+    }
+
+    private static final class ManualExecutorService extends AbstractExecutorService {
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+        private boolean shutdown;
+        private boolean shutdownNow;
+
+        @Override
+        public void shutdown() {
+            shutdown = true;
+        }
+
+        @Override
+        public List<Runnable> shutdownNow() {
+            shutdown = true;
+            shutdownNow = true;
+            List<Runnable> remaining = List.copyOf(tasks);
+            tasks.clear();
+            return remaining;
+        }
+
+        @Override
+        public boolean isShutdown() {
+            return shutdown;
+        }
+
+        @Override
+        public boolean isTerminated() {
+            return shutdown && tasks.isEmpty();
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) {
+            return isTerminated();
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            if (shutdown) {
+                throw new RejectedExecutionException("executor is shut down");
+            }
+            tasks.add(command);
+        }
+
+        void runNext() {
+            Runnable task = tasks.poll();
+            if (task == null) {
+                throw new AssertionError("No queued executor task");
+            }
+            task.run();
+        }
     }
 
     private static final class RecordingAdapter implements HardwareAdapter {

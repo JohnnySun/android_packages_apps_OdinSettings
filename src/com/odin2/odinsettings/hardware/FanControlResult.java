@@ -36,8 +36,8 @@ public final class FanControlResult {
             throw new IllegalArgumentException("Invalid fan status snapshot");
         }
         return new FanControlResult(Code.AVAILABLE, requestedMode,
-                FanActualState.classify(state, pwmHighTimeNs), state, pwmHighTimeNs,
-                tachPulsesTimes300);
+                FanActualState.classify(state, pwmHighTimeNs, tachPulsesTimes300), state,
+                pwmHighTimeNs, tachPulsesTimes300);
     }
 
     public static FanControlResult error(Code code, FanMode requestedMode) {

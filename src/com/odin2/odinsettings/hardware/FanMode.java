@@ -6,11 +6,11 @@ public enum FanMode {
     SPORT("sport", 2);
 
     public final String preferenceValue;
-    public final int nativeValue;
+    public final int serviceValue;
 
-    FanMode(String preferenceValue, int nativeValue) {
+    FanMode(String preferenceValue, int serviceValue) {
         this.preferenceValue = preferenceValue;
-        this.nativeValue = nativeValue;
+        this.serviceValue = serviceValue;
     }
 
     public static FanMode fromPreferenceValue(String value) {
@@ -22,12 +22,12 @@ public enum FanMode {
         throw new IllegalArgumentException("Unknown fan mode");
     }
 
-    public static FanMode fromNativeValue(int value) {
+    public static FanMode fromServiceValue(int value) {
         for (FanMode mode : values()) {
-            if (mode.nativeValue == value) {
+            if (mode.serviceValue == value) {
                 return mode;
             }
         }
-        throw new IllegalArgumentException("Unknown native fan mode");
+        throw new IllegalArgumentException("Unknown fan service mode");
     }
 }

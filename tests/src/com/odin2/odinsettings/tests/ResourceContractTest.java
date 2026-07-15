@@ -28,6 +28,7 @@ final class ResourceContractTest {
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
         assertHandheldActivityLayout(repo);
         assertFanControlIsAllowlisted(repo);
+        assertAppDoesNotOwnFanSysfs(repo);
     }
 
     private static void assertLocaleConfig(Path repo) {
@@ -232,10 +233,26 @@ final class ResourceContractTest {
                 "src/com/odin2/odinsettings/MainSettingsActivity.java"));
         assertTrue(activity.contains("protected void onResume()"),
                 "fan status must refresh when the settings screen resumes");
-        assertTrue(activity.contains("fanController.read()"),
-                "fan status must use the dedicated controller");
-        assertTrue(activity.contains("fanController.apply(requestedMode)"),
-                "fan mode changes must use the dedicated controller");
+        assertTrue(activity.contains("fanApplyDispatcher.submitRead("),
+                "fan status reads must dispatch outside the UI thread");
+        assertFalse(activity.contains("renderFanStatus(fanController.read())"),
+                "fan status reads must not block the UI thread");
+        assertTrue(activity.contains(
+                        "private static final ExecutorService FAN_WORKER = "
+                                + "Executors.newSingleThreadExecutor()"),
+                "all activity generations must share one process fan worker");
+        assertTrue(activity.contains("fanApplyDispatcher.submit("),
+                "fan mode changes must dispatch outside the preference callback");
+        assertFalse(activity.contains("renderFanStatus(fanController.apply("),
+                "fan mode changes must not synchronously call Binder on the UI thread");
+        assertTrue(activity.contains("fanModePreference.setEnabled(false)"),
+                "fan preference must be disabled while a request is pending");
+        assertTrue(activity.contains("isFinishing() || isDestroyed()"),
+                "fan completion must reject stale activity UI updates");
+        assertTrue(activity.contains("fanApplyDispatcher.close()"),
+                "activity destruction must converge the fan worker");
+        assertTrue(activity.contains("return false;"),
+                "preference framework must wait for a confirmed fan response");
         assertTrue(activity.contains("setOnPreferenceChangeListener"),
                 "fan mode must be applied only after a confirmed radio choice");
         assertTrue(activity.contains("protected void onSaveInstanceState(Bundle outState)"),
@@ -244,33 +261,27 @@ final class ResourceContractTest {
                 "requested fan mode restoration must use saved instance state");
 
         String blueprint = read(repo.resolve("Android.bp"));
-        assertTrue(blueprint.contains("jni_libs: [\"libodinsettings_fan_status_jni\"]"),
-                "Odin Settings must package the fan control JNI bridge");
-        String jniModule = module(blueprint, "libodinsettings_fan_status_jni");
-        assertTrue(jniModule.contains("\"libodinsettings_fan_control_core\""),
-                "fan JNI must link the locally tested control core");
+        assertTrue(blueprint.contains("static_libs: [\"com.ayn.fan-java\"]"),
+                "Odin Settings must depend on the private fan AIDL Java library");
 
-        String nativeSource = read(repo.resolve("jni/fan_status_jni.cpp"));
-        assertTrue(nativeSource.contains("WriteStringToFile"),
-                "fan JNI must use the bounded native write adapter");
-        assertFalse(nativeSource.contains("chmod"), "fan JNI must not change permissions");
-        assertFalse(nativeSource.contains("SetProperty"), "fan JNI must not set properties");
-        assertTrue(nativeSource.contains("ro.product.model"),
-                "fan JNI must pass the exact Android model identity");
-        assertTrue(nativeSource.contains("ro.product.device"),
-                "fan status JNI must pass the exact Android product identity");
-        assertTrue(nativeSource.contains("ro.product.name"),
-                "fan JNI must pass the exact Android product identity");
-        assertTrue(nativeSource.contains("ro.soc.model"),
-                "fan JNI must pass the exact SoC identity");
-        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/state"),
-                "fan JNI must use the exact observed state path");
-        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/duty"),
-                "fan JNI must use the exact observed high-time path");
-        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/period"),
-                "fan JNI must use the exact observed period path");
-        assertTrue(nativeSource.contains("/sys/class/gpio5_pwm2/speed"),
-                "fan JNI must read the exact observed tach path");
+        String aidlController = read(repo.resolve(
+                "src/com/odin2/odinsettings/platform/AidlFanController.java"));
+        assertTrue(aidlController.contains("com.ayn.fan.IOdinFan/default"),
+                "fan client must use the private default service instance");
+        assertTrue(aidlController.contains("ServiceManager.checkService(SERVICE_NAME)"),
+                "fan client must perform non-blocking service lookup on its worker");
+        assertTrue(aidlController.contains("private static final IBinder OWNER_TOKEN"),
+                "fan client must retain one process-lifetime owner token");
+        assertTrue(aidlController.contains("private static final AidlFanController INSTANCE"),
+                "fan client cache must live for the app process");
+        assertTrue(aidlController.contains("IOdinFan.Stub.asInterface(binder)"),
+                "fan client must bind through the generated AIDL interface");
+        assertTrue(aidlController.contains("binder.linkToDeath("),
+                "fan client must clear its cache through a death recipient");
+        assertTrue(aidlController.contains("connection.read("),
+                "getStatus must use the tested read-reacquire seam");
+        assertTrue(aidlController.contains("connection.write("),
+                "setMode must use the tested no-retry write seam");
 
         for (String locale : new String[] {
                 "values", "values-zh-rCN", "values-zh-rTW"}) {
@@ -282,19 +293,33 @@ final class ResourceContractTest {
         }
     }
 
-    private static String module(String blueprint, String name) {
-        String marker = "name: \"" + name + "\"";
-        int nameIndex = blueprint.indexOf(marker);
-        if (nameIndex < 0) {
-            throw new AssertionError("Missing Android.bp module " + name);
+    private static void assertAppDoesNotOwnFanSysfs(Path repo) {
+        StringBuilder production = new StringBuilder(read(repo.resolve("Android.bp")));
+        try (java.util.stream.Stream<Path> paths = Files.walk(repo.resolve("src"))) {
+            paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .sorted()
+                    .forEach(path -> production.append('\n').append(read(path)));
+        } catch (IOException exception) {
+            throw new AssertionError("Cannot inspect production app source", exception);
         }
-        int start = blueprint.lastIndexOf("\n", nameIndex);
-        start = blueprint.lastIndexOf("\n", Math.max(0, start - 1));
-        int end = blueprint.indexOf("\n}", nameIndex);
-        if (end < 0) {
-            throw new AssertionError("Unterminated Android.bp module " + name);
+
+        String source = production.toString();
+        assertFalse(source.contains("System.loadLibrary"),
+                "production app source must not load JNI libraries");
+        assertFalse(source.contains("jni_libs"),
+                "production app blueprint must not package JNI libraries");
+        assertFalse(source.contains("gpio5_pwm2"),
+                "production app source must not contain direct fan sysfs paths");
+        Path retiredJni = repo.resolve("jni");
+        if (Files.exists(retiredJni)) {
+            try (java.util.stream.Stream<Path> paths = Files.walk(retiredJni)) {
+                assertFalse(paths.anyMatch(Files::isRegularFile),
+                        "retired fan JNI production sources must be removed");
+            } catch (IOException exception) {
+                throw new AssertionError("Cannot inspect retired JNI directory", exception);
+            }
         }
-        return blueprint.substring(Math.max(0, start), end + 2);
     }
 
     private static Document parse(Path path) {
