@@ -61,7 +61,7 @@ final class ResourceContractTest {
                         "com.android.settings.action.EXTRA_SETTINGS",
                         "android.intent.category.DEFAULT"),
                 "main settings must expose a default Settings tile intent");
-        assertEquals("com.android.settings.category.ia.device",
+        assertEquals("com.android.settings.category.ia.system",
                 metadataValue(mainActivity, "com.android.settings.category"),
                 "Settings tile category");
         assertEquals("@string/app_name",
