@@ -63,6 +63,8 @@ final class ResourceContractTest {
                 "src/com/odin2/odinsettings/platform/ControllerColdBootReceiver.java"));
         assertTrue(receiver.contains("hasOdinGamepad(inputManager)"),
                 "controller prime must skip the display cycle when gamepad is present");
+        assertTrue(receiver.contains("public ControllerColdBootReceiver()"),
+                "manifest receiver must expose a public no-argument constructor");
         assertTrue(receiver.contains("attemptConsumed = true"),
                 "controller prime must consume its only attempt before the display write");
         assertTrue(receiver.contains("GO_TO_SLEEP_FLAG_NO_DOZE")
