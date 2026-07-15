@@ -32,12 +32,18 @@ public final class FanControlResult {
 
     public static FanControlResult available(FanMode requestedMode, int state,
             int pwmHighTimeNs, int tachPulsesTimes300) {
+        return available(requestedMode, requestedMode, state, pwmHighTimeNs,
+                tachPulsesTimes300);
+    }
+
+    public static FanControlResult available(FanMode requestedMode, FanMode actualMode, int state,
+            int pwmHighTimeNs, int tachPulsesTimes300) {
         if ((state != 0 && state != 1) || pwmHighTimeNs < 0 || tachPulsesTimes300 < 0) {
             throw new IllegalArgumentException("Invalid fan status snapshot");
         }
         return new FanControlResult(Code.AVAILABLE, requestedMode,
-                FanActualState.classify(state, pwmHighTimeNs, tachPulsesTimes300), state,
-                pwmHighTimeNs, tachPulsesTimes300);
+                FanActualState.classify(actualMode, state, pwmHighTimeNs,
+                        tachPulsesTimes300), state, pwmHighTimeNs, tachPulsesTimes300);
     }
 
     public static FanControlResult error(Code code, FanMode requestedMode) {

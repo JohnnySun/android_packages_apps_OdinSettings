@@ -6,17 +6,23 @@ public enum FanActualState {
     SPORT,
     UNRECOGNIZED;
 
-    static FanActualState classify(int state, int pwmHighTimeNs, int tachPulsesTimes300) {
+    static FanActualState classify(FanMode mode, int state, int pwmHighTimeNs,
+            int tachPulsesTimes300) {
         if (state == 0 && pwmHighTimeNs == 10000 && tachPulsesTimes300 == 0) {
-            return OFF;
+            return mode == null || mode == FanMode.OFF ? OFF : UNRECOGNIZED;
+        }
+        if (mode == null) {
+            return UNRECOGNIZED;
         }
         if (state != 1 || tachPulsesTimes300 <= 0) {
             return UNRECOGNIZED;
         }
-        if (pwmHighTimeNs == 5000) {
+        if (mode == FanMode.QUIET
+                && pwmHighTimeNs >= 5000 && pwmHighTimeNs <= 25000) {
             return QUIET;
         }
-        if (pwmHighTimeNs == 25000) {
+        if (mode == FanMode.SPORT
+                && pwmHighTimeNs >= 8000 && pwmHighTimeNs <= 25000) {
             return SPORT;
         }
         return UNRECOGNIZED;

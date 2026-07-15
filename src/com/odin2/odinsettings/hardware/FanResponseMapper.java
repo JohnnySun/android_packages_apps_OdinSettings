@@ -39,7 +39,7 @@ public final class FanResponseMapper {
         if (!isCompleteSnapshot(actualMode, state, duty, tach)) {
             return FanControlResult.error(FanControlResult.Code.MALFORMED, requestedMode);
         }
-        return FanControlResult.available(requestedMode, state, duty, tach);
+        return FanControlResult.available(requestedMode, actualMode, state, duty, tach);
     }
 
     private static boolean isCompleteSnapshot(FanMode mode, int state, int duty, int tach) {
@@ -47,9 +47,9 @@ public final class FanResponseMapper {
             case OFF:
                 return state == 0 && duty == 10000 && tach == 0;
             case QUIET:
-                return state == 1 && duty == 5000 && tach > 0;
+                return state == 1 && duty >= 5000 && duty <= 25000 && tach > 0;
             case SPORT:
-                return state == 1 && duty == 25000 && tach > 0;
+                return state == 1 && duty >= 8000 && duty <= 25000 && tach > 0;
         }
         return false;
     }

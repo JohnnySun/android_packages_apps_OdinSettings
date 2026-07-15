@@ -260,14 +260,14 @@ public final class HostTestMain {
                 "exact off actual state");
 
         assertEquals(FanActualState.QUIET,
-                FanControlResult.available(FanMode.QUIET, 1, 5000, 1200).actualState,
-                "quiet actual state");
+                FanControlResult.available(FanMode.QUIET, 1, 7100, 3600).actualState,
+                "quiet curve actual state");
         assertEquals(FanActualState.UNRECOGNIZED,
                 FanControlResult.available(FanMode.QUIET, 1, 5000, 0).actualState,
                 "quiet state and high-time without tach must not claim quiet");
         assertEquals(FanActualState.SPORT,
-                FanControlResult.available(FanMode.SPORT, 1, 25000, 3300).actualState,
-                "sport actual state");
+                FanControlResult.available(FanMode.SPORT, 1, 13000, 5700).actualState,
+                "sport curve actual state");
         assertEquals(FanActualState.UNRECOGNIZED,
                 FanControlResult.available(FanMode.SPORT, 1, 25000, 0).actualState,
                 "sport state and high-time without tach must not claim sport");
@@ -328,7 +328,7 @@ public final class HostTestMain {
     private static void fanResponseMappingRequiresACompleteConfirmedSnapshot() {
         FanControlResult read = FanResponseMapper.map(
                 FanResponseMapper.RESULT_OK, FanMode.QUIET.serviceValue,
-                1, 5000, 1200, null);
+                1, 7100, 3600, null);
         assertEquals(FanActualState.QUIET, read.actualState,
                 "complete read snapshot maps to quiet");
         assertTrue(read.requestedMode == null,
@@ -336,7 +336,7 @@ public final class HostTestMain {
 
         FanControlResult write = FanResponseMapper.map(
                 FanResponseMapper.RESULT_OK, FanMode.SPORT.serviceValue,
-                1, 25000, 3300, FanMode.SPORT);
+                1, 13000, 5700, FanMode.SPORT);
         assertEquals(FanMode.SPORT, write.requestedMode,
                 "confirmed write preserves requested mode");
 
@@ -346,7 +346,7 @@ public final class HostTestMain {
                 "partial success snapshot must be rejected");
         assertEquals(FanControlResult.Code.MALFORMED,
                 FanResponseMapper.map(FanResponseMapper.RESULT_OK,
-                        FanMode.QUIET.serviceValue, 1, 25000, 3300, null).code,
+                        FanMode.QUIET.serviceValue, 1, 4999, 3300, null).code,
                 "mode and snapshot mismatch must be rejected");
         assertEquals(FanControlResult.Code.MALFORMED,
                 FanResponseMapper.map(FanResponseMapper.RESULT_OK,
@@ -613,7 +613,7 @@ public final class HostTestMain {
         @Override
         public FanControlResult read() {
             operations.add("read");
-            return FanControlResult.available(null, 0, 10000, 0);
+            return FanControlResult.available(null, FanMode.OFF, 0, 10000, 0);
         }
 
         @Override
@@ -669,11 +669,14 @@ public final class HostTestMain {
         private static FanControlResult confirmed(FanMode actualMode, FanMode requestedMode) {
             switch (actualMode) {
                 case OFF:
-                    return FanControlResult.available(requestedMode, 0, 10000, 0);
+                    return FanControlResult.available(
+                            requestedMode, actualMode, 0, 10000, 0);
                 case QUIET:
-                    return FanControlResult.available(requestedMode, 1, 5000, 1200);
+                    return FanControlResult.available(
+                            requestedMode, actualMode, 1, 7100, 3600);
                 case SPORT:
-                    return FanControlResult.available(requestedMode, 1, 25000, 3300);
+                    return FanControlResult.available(
+                            requestedMode, actualMode, 1, 13000, 5700);
             }
             throw new IllegalArgumentException("Unknown fake fan mode");
         }
