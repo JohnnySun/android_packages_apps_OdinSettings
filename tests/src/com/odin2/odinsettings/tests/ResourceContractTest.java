@@ -29,6 +29,7 @@ final class ResourceContractTest {
         assertHandheldActivityLayout(repo);
         assertFanControlIsAllowlisted(repo);
         assertAppDoesNotOwnFanSysfs(repo);
+        assertControllerColdBootPrimeIsBounded(repo);
     }
 
     private static void assertLocaleConfig(Path repo) {
@@ -47,6 +48,29 @@ final class ResourceContractTest {
         expected.add("zh-CN");
         expected.add("zh-TW");
         assertEquals(expected, names, "platform locale config");
+    }
+
+    private static void assertControllerColdBootPrimeIsBounded(Path repo) {
+        String manifest = read(repo.resolve("AndroidManifest.xml"));
+        assertTrue(manifest.contains("android.permission.DEVICE_POWER"),
+                "controller prime must declare the platform display-power permission");
+        assertTrue(manifest.contains("android.intent.action.LOCKED_BOOT_COMPLETED"),
+                "controller prime must run once from the direct-boot broadcast");
+        assertTrue(manifest.contains("android:exported=\"false\""),
+                "controller prime receiver must not be externally callable");
+
+        String receiver = read(repo.resolve(
+                "src/com/odin2/odinsettings/platform/ControllerColdBootReceiver.java"));
+        assertTrue(receiver.contains("hasOdinGamepad(inputManager)"),
+                "controller prime must skip the display cycle when gamepad is present");
+        assertTrue(receiver.contains("attemptConsumed = true"),
+                "controller prime must consume its only attempt before the display write");
+        assertTrue(receiver.contains("GO_TO_SLEEP_FLAG_NO_DOZE")
+                        && receiver.contains("WAKE_REASON_APPLICATION"),
+                "controller prime must use one bounded framework display cycle");
+        assertFalse(receiver.contains("driver_ctl") || receiver.contains("mcupower")
+                        || receiver.contains("/sys/") || receiver.contains("gpio"),
+                "controller prime must never own kernel or MCU control paths");
     }
 
     private static void assertSettingsTheme(Path stylesPath) {

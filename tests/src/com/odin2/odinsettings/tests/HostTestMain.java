@@ -20,6 +20,7 @@ import com.odin2.odinsettings.hardware.HardwareAdapter;
 import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.service.ControllerProfileCoordinator;
+import com.odin2.odinsettings.service.ControllerColdBootPolicy;
 import com.odin2.odinsettings.service.ExternalDisplayCoordinator;
 
 import java.util.ArrayDeque;
@@ -47,6 +48,7 @@ public final class HostTestMain {
         capabilityGatePreventsUnsupportedCalls();
         reviewedAdapterCanReceiveRecognizedProfile();
         externalDisplayUsesTheSameIdentityAndCapabilityGates();
+        controllerColdBootCycleIsBoundedAndFailClosed();
         fanModesAreStrictlyAllowlisted();
         fanStatusClassifiesActualStateTruthfully();
         fanControlErrorsCannotCarryPartialData();
@@ -229,6 +231,23 @@ public final class HostTestMain {
 
     private static DeviceIdentity knownIdentity() {
         return new DeviceIdentity("Odin2_Mini", "kalama", "kalama", "QCS8550");
+    }
+
+    private static void controllerColdBootCycleIsBoundedAndFailClosed() {
+        ControllerColdBootPolicy policy = new ControllerColdBootPolicy();
+        assertEquals(ControllerColdBootPolicy.Decision.SKIP_UNKNOWN_DEVICE,
+                policy.decide(false, false, false),
+                "unknown device must not cycle the display");
+        assertEquals(ControllerColdBootPolicy.Decision.SKIP_CONTROLLER_PRESENT,
+                policy.decide(true, true, false),
+                "published gamepad must not cycle the display");
+        assertEquals(ControllerColdBootPolicy.Decision.SKIP_ATTEMPT_CONSUMED,
+                policy.decide(true, false, true),
+                "a failed cycle must not retry during the same boot");
+        assertEquals(ControllerColdBootPolicy.Decision.CYCLE_DISPLAY_ONCE,
+                policy.decide(true, false, false),
+                "recognized device with missing gamepad gets one display cycle");
+        pass();
     }
 
     private static void fanModesAreStrictlyAllowlisted() {
