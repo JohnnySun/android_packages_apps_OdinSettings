@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Odin 設定</string>
+    <string name="settings_entry_summary">設定手柄、顯示器與硬體控制</string>
     <string name="tile_keep_screen_on">保持螢幕開啟</string>
     <string name="tile_force_landscape">強制橫向顯示</string>
     <string name="bringup_summary">完成原廠控制路徑驗證前，裝置控制功能維持停用。</string>

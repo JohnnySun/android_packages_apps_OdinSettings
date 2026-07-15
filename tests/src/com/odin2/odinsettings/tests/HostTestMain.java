@@ -5,6 +5,7 @@ import com.odin2.odinsettings.domain.ControllerAxisNormalizer;
 import com.odin2.odinsettings.domain.ControllerButton;
 import com.odin2.odinsettings.domain.ControllerProfile;
 import com.odin2.odinsettings.domain.ControllerProfiles;
+import com.odin2.odinsettings.domain.ControllerScanCodeMapper;
 import com.odin2.odinsettings.hardware.AdapterCapability;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.AdapterStatus;
@@ -40,6 +41,7 @@ public final class HostTestMain {
         standardProfileIsIdentity();
         flippedProfileSwapsOnlyFaceButtons();
         unknownStoredProfileFallsBackToStandard();
+        controllerScanCodesPreferPhysicalButtonIdentity();
         controllerAxesNormalizePublishedGamepadRanges();
         controllerAxesClampAndHonorFlatZones();
         identityPolicyAcceptsOnlyProvenDeviceProductPairs();
@@ -91,6 +93,16 @@ public final class HostTestMain {
         assertEquals(ControllerProfiles.STANDARD,
                 ControllerProfiles.findOrDefault("corrupt-or-future-value"),
                 "unknown preview profile fallback");
+        pass();
+    }
+
+    private static void controllerScanCodesPreferPhysicalButtonIdentity() {
+        assertEquals(ControllerButton.B, ControllerScanCodeMapper.fromScanCode(305),
+                "BTN_EAST scan code");
+        assertEquals(ControllerButton.BACK, ControllerScanCodeMapper.fromScanCode(278),
+                "BTN_BACK scan code");
+        assertTrue(ControllerScanCodeMapper.fromScanCode(999) == null,
+                "unknown scan code must not be guessed");
         pass();
     }
 

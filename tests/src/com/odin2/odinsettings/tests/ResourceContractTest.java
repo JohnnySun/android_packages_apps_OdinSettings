@@ -21,6 +21,7 @@ final class ResourceContractTest {
         UiResourceContractTest.verify(repo);
         assertSettingsTheme(repo.resolve("res/values/styles.xml"));
         assertLocaleConfig(repo);
+        assertDiscoverableEntrypoints(repo);
         assertLocaleMatches(repo, "values-zh-rTW");
         assertLocaleMatches(repo, "values-zh-rCN");
         assertStableControllerProfileValues(repo.resolve("res/values/arrays.xml"));
@@ -48,6 +49,112 @@ final class ResourceContractTest {
         expected.add("zh-CN");
         expected.add("zh-TW");
         assertEquals(expected, names, "platform locale config");
+    }
+
+    private static void assertDiscoverableEntrypoints(Path repo) {
+        Document manifest = parse(repo.resolve("AndroidManifest.xml"));
+        Element mainActivity = findComponent(
+                manifest, "activity", ".MainSettingsActivity");
+        assertEquals("true", mainActivity.getAttribute("android:exported"),
+                "main settings exported state");
+        assertTrue(hasIntentFilter(mainActivity,
+                        "com.android.settings.action.EXTRA_SETTINGS",
+                        "android.intent.category.DEFAULT"),
+                "main settings must expose a default Settings tile intent");
+        assertEquals("com.android.settings.category.ia.device",
+                metadataValue(mainActivity, "com.android.settings.category"),
+                "Settings tile category");
+        assertEquals("@string/app_name",
+                metadataResource(mainActivity, "com.android.settings.title"),
+                "Settings tile title");
+        assertEquals("@string/settings_entry_summary",
+                metadataResource(mainActivity, "com.android.settings.summary"),
+                "Settings tile summary");
+        assertEquals("@drawable/ic_settings_odin",
+                metadataResource(mainActivity, "com.android.settings.icon"),
+                "Settings tile icon");
+        assertEquals("primary_profile_only",
+                metadataValue(mainActivity, "com.android.settings.profile"),
+                "Settings tile profile");
+        assertFalse(hasIntentCategory(mainActivity, "android.intent.category.LAUNCHER"),
+                "launcher discovery must be owned by a dedicated alias");
+
+        Element launcherAlias = findComponent(manifest, "activity-alias", ".LauncherActivity");
+        assertEquals(".MainSettingsActivity",
+                launcherAlias.getAttribute("android:targetActivity"),
+                "launcher alias target");
+        assertEquals("true", launcherAlias.getAttribute("android:exported"),
+                "launcher alias exported state");
+        assertEquals("@string/app_name", launcherAlias.getAttribute("android:label"),
+                "launcher alias label");
+        assertEquals("@drawable/ic_settings_odin", launcherAlias.getAttribute("android:icon"),
+                "launcher alias icon");
+        assertTrue(hasIntentFilter(launcherAlias,
+                        "android.intent.action.MAIN",
+                        "android.intent.category.LAUNCHER"),
+                "launcher alias must be discoverable from the app launcher");
+
+        assertTrue(Files.isRegularFile(repo.resolve("res/drawable/ic_settings_odin.xml")),
+                "discoverable entries must provide a dedicated icon");
+        assertTrue(resourceNames(repo.resolve("res/values/strings.xml"), "string")
+                        .contains("settings_entry_summary"),
+                "Settings tile must provide a localized summary resource");
+    }
+
+    private static Element findComponent(Document document, String tagName, String name) {
+        NodeList components = document.getElementsByTagName(tagName);
+        for (int i = 0; i < components.getLength(); i++) {
+            Element component = (Element) components.item(i);
+            if (name.equals(component.getAttribute("android:name"))) {
+                return component;
+            }
+        }
+        throw new AssertionError("Missing " + tagName + " " + name);
+    }
+
+    private static boolean hasIntentFilter(Element component, String action, String category) {
+        NodeList filters = component.getElementsByTagName("intent-filter");
+        for (int i = 0; i < filters.getLength(); i++) {
+            Element filter = (Element) filters.item(i);
+            if (hasNamedElement(filter, "action", action)
+                    && hasNamedElement(filter, "category", category)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasIntentCategory(Element component, String category) {
+        return hasNamedElement(component, "category", category);
+    }
+
+    private static boolean hasNamedElement(Element parent, String tagName, String name) {
+        NodeList elements = parent.getElementsByTagName(tagName);
+        for (int i = 0; i < elements.getLength(); i++) {
+            if (name.equals(((Element) elements.item(i)).getAttribute("android:name"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String metadataResource(Element component, String name) {
+        return metadataAttribute(component, name, "android:resource");
+    }
+
+    private static String metadataValue(Element component, String name) {
+        return metadataAttribute(component, name, "android:value");
+    }
+
+    private static String metadataAttribute(Element component, String name, String attribute) {
+        NodeList metadata = component.getElementsByTagName("meta-data");
+        for (int i = 0; i < metadata.getLength(); i++) {
+            Element item = (Element) metadata.item(i);
+            if (name.equals(item.getAttribute("android:name"))) {
+                return item.getAttribute(attribute);
+            }
+        }
+        throw new AssertionError("Missing metadata " + name);
     }
 
     private static void assertControllerColdBootPrimeIsBounded(Path repo) {
@@ -144,6 +251,24 @@ final class ResourceContractTest {
     }
 
     private static void assertHandheldActivityLayout(Path repo) {
+        Document manifest = parse(repo.resolve("AndroidManifest.xml"));
+        NodeList activities = manifest.getElementsByTagName("activity");
+        boolean controllerTestDisablesPredictiveBack = false;
+        for (int i = 0; i < activities.getLength(); i++) {
+            Element activity = (Element) activities.item(i);
+            String name = activity.getAttribute("android:name");
+            String backCallback = activity.getAttribute(
+                    "android:enableOnBackInvokedCallback");
+            if (".ControllerTestActivity".equals(name)) {
+                controllerTestDisablesPredictiveBack = "false".equals(backCallback);
+            } else {
+                assertFalse(activity.hasAttribute("android:enableOnBackInvokedCallback"),
+                        "predictive back opt-out must be limited to controller test");
+            }
+        }
+        assertTrue(controllerTestDisablesPredictiveBack,
+                "controller test must receive legacy back key events");
+
         String mainActivity = read(repo.resolve(
                 "src/com/odin2/odinsettings/MainSettingsActivity.java"));
         assertTrue(mainActivity.contains("boolean onIsMultiPane()"),
@@ -198,6 +323,14 @@ final class ResourceContractTest {
         assertTrue(controllerTest.indexOf("showButton(physical)")
                         < controllerTest.indexOf("physical == ControllerButton.A && done.hasFocus()"),
                 "controller test must record gamepad A before any focused Done activation");
+        assertTrue(controllerTest.contains(
+                        "ControllerScanCodeMapper.fromScanCode(event.getScanCode())"),
+                "controller test must map the physical scan code");
+        assertTrue(controllerTest.indexOf(
+                        "ControllerScanCodeMapper.fromScanCode(event.getScanCode())")
+                        < controllerTest.indexOf(
+                                "AndroidControllerInputMapper.fromKeyCode(event.getKeyCode())"),
+                "controller test must prefer scan code identity before keycode fallback");
         assertFalse(controllerTest.contains("ControllerNavigation.isBack"),
                 "controller test must capture gamepad B instead of closing");
         assertTrue(controllerTest.contains("R.layout.controller_test_activity"),

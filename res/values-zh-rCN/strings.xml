@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Odin 设置</string>
+    <string name="settings_entry_summary">配置手柄、显示和硬件控制</string>
     <string name="tile_keep_screen_on">保持屏幕常亮</string>
     <string name="tile_force_landscape">强制横屏</string>
     <string name="bringup_summary">完成原厂控制路径验证前，设备控制功能保持禁用。</string>

@@ -16,6 +16,7 @@ import android.widget.TextView;
 import com.odin2.odinsettings.domain.ControllerAxisNormalizer;
 import com.odin2.odinsettings.domain.ControllerButton;
 import com.odin2.odinsettings.domain.ControllerProfile;
+import com.odin2.odinsettings.domain.ControllerScanCodeMapper;
 import com.odin2.odinsettings.platform.AndroidControllerInputMapper;
 import com.odin2.odinsettings.platform.ControllerDisplayNames;
 import com.odin2.odinsettings.platform.ControllerNavigation;
@@ -103,7 +104,10 @@ public final class ControllerTestActivity extends Activity
             return super.dispatchKeyEvent(event);
         }
         showDevice(device);
-        ControllerButton physical = AndroidControllerInputMapper.fromKeyCode(event.getKeyCode());
+        ControllerButton physical = ControllerScanCodeMapper.fromScanCode(event.getScanCode());
+        if (physical == null) {
+            physical = AndroidControllerInputMapper.fromKeyCode(event.getKeyCode());
+        }
         if (physical == null) {
             return super.dispatchKeyEvent(event);
         }

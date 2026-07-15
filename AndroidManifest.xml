@@ -21,11 +21,40 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <meta-data
+                android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.device" />
+            <meta-data
+                android:name="com.android.settings.title"
+                android:resource="@string/app_name" />
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/settings_entry_summary" />
+            <meta-data
+                android:name="com.android.settings.icon"
+                android:resource="@drawable/ic_settings_odin" />
+            <meta-data
+                android:name="com.android.settings.profile"
+                android:value="primary_profile_only" />
         </activity>
+
+        <activity-alias
+            android:name=".LauncherActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_settings_odin"
+            android:label="@string/app_name"
+            android:targetActivity=".MainSettingsActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".ControllerTestActivity"
+            android:enableOnBackInvokedCallback="false"
             android:exported="false"
             android:label="@string/controller_test_title"
             android:parentActivityName=".MainSettingsActivity" />
