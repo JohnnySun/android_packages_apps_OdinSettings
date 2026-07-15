@@ -185,8 +185,9 @@ final class ResourceContractTest {
         String inputMapper = read(repo.resolve(
                 "src/com/odin2/odinsettings/platform/AndroidControllerInputMapper.java"));
         assertTrue(inputMapper.contains("KeyEvent.KEYCODE_F1")
+                        && inputMapper.contains("KeyEvent.KEYCODE_BACK")
                         && inputMapper.contains("ControllerButton.BACK"),
-                "controller test must capture the published BTN_BACK F1 key");
+                "controller test must capture both BTN_BACK F1 and framework back keys");
         assertTrue(controllerTest.contains("content.requestFocus()"),
                 "controller test must start in capture focus instead of focusing Done");
         assertTrue(controllerTest.contains(
