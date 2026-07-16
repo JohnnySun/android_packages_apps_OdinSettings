@@ -10,14 +10,14 @@ public final class ControllerProfileResponseMapper {
                 requestedProfileValue);
         ControllerProfile actual = ControllerProfileServiceContract.fromServiceProfile(
                 activeProfileValue);
-        if (code == AdapterResult.Code.OK && actual == null) {
+        if (code != AdapterResult.Code.OK) {
+            return AdapterResult.forRequest(code, requested, detail(code));
+        }
+        if (actual == null) {
             return AdapterResult.of(AdapterResult.Code.INVALID_PROFILE,
                     "Controller service returned OK without a valid active profile.");
         }
-        if (actual != null) {
-            return AdapterResult.withProfiles(code, actual, requested, detail(code));
-        }
-        return AdapterResult.forRequest(code, requested, detail(code));
+        return AdapterResult.withProfiles(code, actual, requested, detail(code));
     }
 
     public static AdapterResult mapSetResponse(int resultCode,
@@ -38,7 +38,10 @@ public final class ControllerProfileResponseMapper {
             return AdapterResult.forRequest(AdapterResult.Code.INVALID_PROFILE, requested,
                     "Controller profile is invalid.");
         }
-        if (code == AdapterResult.Code.OK && requestedProfileValue != expectedRequested) {
+        if (code != AdapterResult.Code.OK) {
+            return AdapterResult.forRequest(code, requested, detail(code));
+        }
+        if (requestedProfileValue != expectedRequested) {
             return AdapterResult.withProfiles(AdapterResult.Code.INVALID_PROFILE,
                     actual, requested,
                     "Controller service returned a mismatched requested profile.");

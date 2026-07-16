@@ -274,18 +274,24 @@ public final class HostTestMain {
                 ControllerProfileResponseMapper.mapSetResponse(
                         99, 0, 0, ControllerProfiles.STANDARD).code,
                 "unknown setProfile result must fail closed");
+        assertFalse(ControllerProfileResponseMapper.mapSetResponse(
+                        ControllerProfileServiceContract.RESULT_STORE_WRITE_FAILED,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfiles.FLIPPED_FACE).hasProfile(),
+                "setProfile failure must not expose an unconfirmed active profile");
         assertEquals(AdapterResult.Code.STORE_READ_FAILED,
                 ControllerProfileResponseMapper.mapReadResponse(
                         ControllerProfileServiceContract.RESULT_STORE_READ_FAILED,
                         ControllerProfileServiceContract.PROFILE_STANDARD,
                         ControllerProfileServiceContract.PROFILE_FLIPPED_FACE).code,
                 "getProfile must preserve its exact failure result");
-        assertEquals(ControllerProfiles.FLIPPED_FACE,
-                ControllerProfileResponseMapper.mapReadResponse(
+        assertTrue(ControllerProfileResponseMapper.mapReadResponse(
                         ControllerProfileServiceContract.RESULT_STORE_READ_FAILED,
                         ControllerProfileServiceContract.PROFILE_STANDARD,
-                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE).actualProfile,
-                "getProfile failure must retain a usable active profile");
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE).actualProfile
+                        == null,
+                "getProfile failure must not expose an unconfirmed active profile");
         assertEquals(ControllerProfiles.STANDARD,
                 ControllerProfileResponseMapper.mapReadResponse(
                         ControllerProfileServiceContract.RESULT_STORE_READ_FAILED,
