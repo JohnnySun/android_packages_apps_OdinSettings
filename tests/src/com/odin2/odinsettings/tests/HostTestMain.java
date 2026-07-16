@@ -26,6 +26,7 @@ import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.service.ControllerProfileCoordinator;
 import com.odin2.odinsettings.service.ControllerColdBootPolicy;
+import com.odin2.odinsettings.service.ControllerColdBootTiming;
 import com.odin2.odinsettings.service.ExternalDisplayCoordinator;
 
 import java.util.ArrayDeque;
@@ -59,6 +60,7 @@ public final class HostTestMain {
         controllerProfileDispatchesOffUiAndSuppressesStaleCallbacks();
         externalDisplayUsesTheSameIdentityAndCapabilityGates();
         controllerColdBootCycleIsBoundedAndFailClosed();
+        controllerColdBootCycleFitsBroadcastDeadline();
         fanModesAreStrictlyAllowlisted();
         fanStatusClassifiesActualStateTruthfully();
         fanControlErrorsCannotCarryPartialData();
@@ -436,6 +438,16 @@ public final class HostTestMain {
         assertEquals(ControllerColdBootPolicy.Decision.CYCLE_DISPLAY_ONCE,
                 policy.decide(true, false),
                 "recognized device with missing gamepad gets one display cycle");
+        pass();
+    }
+
+    private static void controllerColdBootCycleFitsBroadcastDeadline() {
+        assertTrue(ControllerColdBootTiming.totalCycleMillis()
+                        < ControllerColdBootTiming.BROADCAST_DEADLINE_MILLIS,
+                "display cycle must finish before the broadcast ANR deadline");
+        assertTrue(ControllerColdBootTiming.WAKE_LOCK_TIMEOUT_MILLIS
+                        > ControllerColdBootTiming.totalCycleMillis(),
+                "wake lock must cover the complete display cycle");
         pass();
     }
 

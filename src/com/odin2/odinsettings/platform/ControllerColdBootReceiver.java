@@ -11,6 +11,7 @@ import android.view.InputDevice;
 
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.service.ControllerColdBootPolicy;
+import com.odin2.odinsettings.service.ControllerColdBootTiming;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,11 +21,6 @@ public final class ControllerColdBootReceiver extends BroadcastReceiver {
     private static final String TAG = "OdinControllerPrime";
     private static final int ODIN_GAMEPAD_VENDOR_ID = 0x2020;
     private static final int ODIN_GAMEPAD_PRODUCT_ID = 0x3001;
-    private static final long START_DELAY_MILLIS = 10_000;
-    private static final long DISPLAY_OFF_MILLIS = 1_000;
-    private static final long PUBLICATION_SETTLE_MILLIS = 3_000;
-    private static final long WAKE_LOCK_TIMEOUT_MILLIS = 8_000;
-
     private static boolean attemptConsumed;
 
     @Override
@@ -46,7 +42,7 @@ public final class ControllerColdBootReceiver extends BroadcastReceiver {
     }
 
     private static void runOnce(Context context) {
-        if (!sleep(START_DELAY_MILLIS)) {
+        if (!sleep(ControllerColdBootTiming.START_DELAY_MILLIS)) {
             return;
         }
 
@@ -71,18 +67,18 @@ public final class ControllerColdBootReceiver extends BroadcastReceiver {
 
         PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK, TAG + ":display-cycle");
-        wakeLock.acquire(WAKE_LOCK_TIMEOUT_MILLIS);
+        wakeLock.acquire(ControllerColdBootTiming.WAKE_LOCK_TIMEOUT_MILLIS);
         try {
             long sleepTime = SystemClock.uptimeMillis();
             powerManager.goToSleep(sleepTime,
                     PowerManager.GO_TO_SLEEP_REASON_APPLICATION,
                     PowerManager.GO_TO_SLEEP_FLAG_NO_DOZE);
-            if (!sleep(DISPLAY_OFF_MILLIS)) {
+            if (!sleep(ControllerColdBootTiming.DISPLAY_OFF_MILLIS)) {
                 return;
             }
             powerManager.wakeUp(SystemClock.uptimeMillis(),
                     PowerManager.WAKE_REASON_APPLICATION, TAG);
-            if (!sleep(PUBLICATION_SETTLE_MILLIS)) {
+            if (!sleep(ControllerColdBootTiming.PUBLICATION_SETTLE_MILLIS)) {
                 return;
             }
             Log.i(TAG, "one-shot display cycle complete; gamepad="
