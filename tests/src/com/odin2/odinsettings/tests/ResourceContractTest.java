@@ -493,8 +493,9 @@ final class ResourceContractTest {
                 "fan client must use the private default service instance");
         assertTrue(aidlController.contains("ServiceManager.checkService(SERVICE_NAME)"),
                 "fan client must perform non-blocking service lookup on its worker");
-        assertTrue(aidlController.contains("private static final IBinder OWNER_TOKEN"),
-                "fan client must retain one process-lifetime owner token");
+        assertFalse(aidlController.contains("OWNER_TOKEN")
+                        || aidlController.contains("new Binder()"),
+                "fan client must not own the persistent daemon mode");
         assertTrue(aidlController.contains("private static final AidlFanController INSTANCE"),
                 "fan client cache must live for the app process");
         assertTrue(aidlController.contains("IOdinFan.Stub.asInterface(binder)"),
@@ -505,6 +506,8 @@ final class ResourceContractTest {
                 "getStatus must use the tested read-reacquire seam");
         assertTrue(aidlController.contains("connection.write("),
                 "setMode must use the tested no-retry write seam");
+        assertTrue(aidlController.contains("service.setMode(mode.serviceValue)"),
+                "setMode must not send an app process owner token");
 
         for (String locale : new String[] {
                 "values", "values-zh-rCN", "values-zh-rTW"}) {

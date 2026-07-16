@@ -1,6 +1,5 @@
 package com.odin2.odinsettings.platform;
 
-import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -15,7 +14,6 @@ import com.odin2.odinsettings.hardware.FanServiceConnection;
 
 public final class AidlFanController implements FanController {
     private static final String SERVICE_NAME = "com.ayn.fan.IOdinFan/default";
-    private static final IBinder OWNER_TOKEN = new Binder();
     private static final AidlFanController INSTANCE = new AidlFanController();
 
     private final FanServiceConnection<IOdinFan> connection =
@@ -50,7 +48,7 @@ public final class AidlFanController implements FanController {
             public FanControlResult call(IOdinFan service)
                     throws FanServiceConnection.RemoteFailure {
                 try {
-                    return map(service.setMode(mode.serviceValue, OWNER_TOKEN), mode);
+                    return map(service.setMode(mode.serviceValue), mode);
                 } catch (RemoteException exception) {
                     throw remoteFailure("setMode outcome is unknown", exception);
                 }
