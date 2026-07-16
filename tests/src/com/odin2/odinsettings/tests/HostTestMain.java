@@ -425,16 +425,16 @@ public final class HostTestMain {
     private static void controllerColdBootCycleIsBoundedAndFailClosed() {
         ControllerColdBootPolicy policy = new ControllerColdBootPolicy();
         assertEquals(ControllerColdBootPolicy.Decision.SKIP_UNKNOWN_DEVICE,
-                policy.decide(false, false, false),
+                policy.decide(false, false),
                 "unknown device must not cycle the display");
-        assertEquals(ControllerColdBootPolicy.Decision.SKIP_CONTROLLER_PRESENT,
-                policy.decide(true, true, false),
-                "published gamepad must not cycle the display");
+        assertEquals(ControllerColdBootPolicy.Decision.CYCLE_DISPLAY_ONCE,
+                policy.decide(true, false),
+                "a published gamepad is not proof that MCU input is live");
         assertEquals(ControllerColdBootPolicy.Decision.SKIP_ATTEMPT_CONSUMED,
-                policy.decide(true, false, true),
+                policy.decide(true, true),
                 "a failed cycle must not retry during the same boot");
         assertEquals(ControllerColdBootPolicy.Decision.CYCLE_DISPLAY_ONCE,
-                policy.decide(true, false, false),
+                policy.decide(true, false),
                 "recognized device with missing gamepad gets one display cycle");
         pass();
     }

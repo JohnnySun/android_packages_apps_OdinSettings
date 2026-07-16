@@ -55,8 +55,9 @@ public final class ControllerColdBootReceiver extends BroadcastReceiver {
         boolean recognizedDevice = new HardwareAccessPolicy()
                 .evaluate(AndroidDeviceIdentity.current()).allowed;
         ControllerColdBootPolicy.Decision decision = new ControllerColdBootPolicy()
-                .decide(recognizedDevice, controllerPresent, attemptConsumed);
-        Log.i(TAG, "cold-boot decision=" + decision);
+                .decide(recognizedDevice, attemptConsumed);
+        Log.i(TAG, "cold-boot decision=" + decision
+                + "; gamepad-published=" + controllerPresent);
         if (decision != ControllerColdBootPolicy.Decision.CYCLE_DISPLAY_ONCE) {
             return;
         }
