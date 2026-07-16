@@ -26,7 +26,6 @@ import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.service.ControllerProfileCoordinator;
 import com.odin2.odinsettings.service.ControllerColdBootPolicy;
-import com.odin2.odinsettings.service.ControllerColdBootTiming;
 import com.odin2.odinsettings.service.ExternalDisplayCoordinator;
 
 import java.util.ArrayDeque;
@@ -442,11 +441,11 @@ public final class HostTestMain {
     }
 
     private static void controllerColdBootCycleFitsBroadcastDeadline() {
-        assertTrue(ControllerColdBootTiming.totalCycleMillis()
-                        < ControllerColdBootTiming.BROADCAST_DEADLINE_MILLIS,
+        assertTrue(ControllerColdBootPolicy.totalCycleMillis()
+                        < ControllerColdBootPolicy.BROADCAST_DEADLINE_MILLIS,
                 "display cycle must finish before the broadcast ANR deadline");
-        assertTrue(ControllerColdBootTiming.WAKE_LOCK_TIMEOUT_MILLIS
-                        > ControllerColdBootTiming.totalCycleMillis(),
+        assertTrue(ControllerColdBootPolicy.WAKE_LOCK_TIMEOUT_MILLIS
+                        > ControllerColdBootPolicy.totalCycleMillis(),
                 "wake lock must cover the complete display cycle");
         pass();
     }

@@ -11,7 +11,6 @@ import android.view.InputDevice;
 
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.service.ControllerColdBootPolicy;
-import com.odin2.odinsettings.service.ControllerColdBootTiming;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,7 +41,7 @@ public final class ControllerColdBootReceiver extends BroadcastReceiver {
     }
 
     private static void runOnce(Context context) {
-        if (!sleep(ControllerColdBootTiming.START_DELAY_MILLIS)) {
+        if (!sleep(ControllerColdBootPolicy.START_DELAY_MILLIS)) {
             return;
         }
 
@@ -67,18 +66,18 @@ public final class ControllerColdBootReceiver extends BroadcastReceiver {
 
         PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK, TAG + ":display-cycle");
-        wakeLock.acquire(ControllerColdBootTiming.WAKE_LOCK_TIMEOUT_MILLIS);
+        wakeLock.acquire(ControllerColdBootPolicy.WAKE_LOCK_TIMEOUT_MILLIS);
         try {
             long sleepTime = SystemClock.uptimeMillis();
             powerManager.goToSleep(sleepTime,
                     PowerManager.GO_TO_SLEEP_REASON_APPLICATION,
                     PowerManager.GO_TO_SLEEP_FLAG_NO_DOZE);
-            if (!sleep(ControllerColdBootTiming.DISPLAY_OFF_MILLIS)) {
+            if (!sleep(ControllerColdBootPolicy.DISPLAY_OFF_MILLIS)) {
                 return;
             }
             powerManager.wakeUp(SystemClock.uptimeMillis(),
                     PowerManager.WAKE_REASON_APPLICATION, TAG);
-            if (!sleep(ControllerColdBootTiming.PUBLICATION_SETTLE_MILLIS)) {
+            if (!sleep(ControllerColdBootPolicy.PUBLICATION_SETTLE_MILLIS)) {
                 return;
             }
             Log.i(TAG, "one-shot display cycle complete; gamepad="
