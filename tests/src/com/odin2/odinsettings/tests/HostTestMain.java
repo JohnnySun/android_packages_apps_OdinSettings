@@ -3,6 +3,7 @@ package com.odin2.odinsettings.tests;
 import com.odin2.odinsettings.display.ExternalDisplayPolicy;
 import com.odin2.odinsettings.domain.ControllerAxisNormalizer;
 import com.odin2.odinsettings.domain.ControllerButton;
+import com.odin2.odinsettings.domain.ControllerKeyCapturePolicy;
 import com.odin2.odinsettings.domain.ControllerProfile;
 import com.odin2.odinsettings.domain.ControllerProfiles;
 import com.odin2.odinsettings.domain.ControllerScanCodeMapper;
@@ -42,6 +43,7 @@ public final class HostTestMain {
         flippedProfileSwapsOnlyFaceButtons();
         unknownStoredProfileFallsBackToStandard();
         controllerScanCodesPreferPhysicalButtonIdentity();
+        controllerKeyCapturePreservesFrameworkBackFallback();
         controllerAxesNormalizePublishedGamepadRanges();
         controllerAxesClampAndHonorFlatZones();
         identityPolicyAcceptsOnlyProvenDeviceProductPairs();
@@ -103,6 +105,19 @@ public final class HostTestMain {
                 "BTN_BACK scan code");
         assertTrue(ControllerScanCodeMapper.fromScanCode(999) == null,
                 "unknown scan code must not be guessed");
+        pass();
+    }
+
+    private static void controllerKeyCapturePreservesFrameworkBackFallback() {
+        assertEquals(ControllerButton.B,
+                ControllerKeyCapturePolicy.select(
+                        ControllerButton.B, ControllerButton.BACK, true),
+                "controller scan code identity wins over framework fallback");
+        assertEquals(ControllerButton.BACK,
+                ControllerKeyCapturePolicy.select(null, ControllerButton.BACK, false),
+                "framework Back remains visible even after controller source fallback");
+        assertTrue(ControllerKeyCapturePolicy.select(null, ControllerButton.B, false) == null,
+                "non-controller face buttons remain rejected");
         pass();
     }
 

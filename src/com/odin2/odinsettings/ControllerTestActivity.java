@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import com.odin2.odinsettings.domain.ControllerAxisNormalizer;
 import com.odin2.odinsettings.domain.ControllerButton;
+import com.odin2.odinsettings.domain.ControllerKeyCapturePolicy;
 import com.odin2.odinsettings.domain.ControllerProfile;
 import com.odin2.odinsettings.domain.ControllerScanCodeMapper;
 import com.odin2.odinsettings.platform.AndroidControllerInputMapper;
@@ -100,17 +101,15 @@ public final class ControllerTestActivity extends Activity
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         InputDevice device = event.getDevice();
-        if (!isControllerEvent(event, device)) {
+        boolean controllerEvent = isControllerEvent(event, device);
+        ControllerButton physical = ControllerKeyCapturePolicy.select(
+                ControllerScanCodeMapper.fromScanCode(event.getScanCode()),
+                AndroidControllerInputMapper.fromKeyCode(event.getKeyCode()),
+                controllerEvent);
+        if (physical == null) {
             return super.dispatchKeyEvent(event);
         }
         showDevice(device);
-        ControllerButton physical = ControllerScanCodeMapper.fromScanCode(event.getScanCode());
-        if (physical == null) {
-            physical = AndroidControllerInputMapper.fromKeyCode(event.getKeyCode());
-        }
-        if (physical == null) {
-            return super.dispatchKeyEvent(event);
-        }
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             showButton(physical);
         }
