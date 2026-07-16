@@ -25,12 +25,49 @@ final class ResourceContractTest {
         assertLocaleMatches(repo, "values-zh-rTW");
         assertLocaleMatches(repo, "values-zh-rCN");
         assertStableControllerProfileValues(repo.resolve("res/values/arrays.xml"));
+        assertSystemControllerProfileClient(repo);
         assertControllerLabelsAreLocalized(repo.resolve(
                 "src/com/odin2/odinsettings/ControllerTestActivity.java"));
         assertHandheldActivityLayout(repo);
         assertFanControlIsAllowlisted(repo);
         assertAppDoesNotOwnFanSysfs(repo);
         assertControllerColdBootPrimeIsBounded(repo);
+    }
+
+    private static void assertSystemControllerProfileClient(Path repo) {
+        String build = read(repo.resolve("Android.bp"));
+        assertTrue(build.contains("\"com.ayn.controller-java\""),
+                "Odin Settings must link the controller Java static library");
+
+        String preferences = read(repo.resolve("res/xml/main_preferences.xml"));
+        assertTrue(preferences.contains("android:key=\"system_controller_profile\""),
+                "the profile list must own the system profile key");
+        assertFalse(preferences.contains("preview_controller_profile")
+                        || preferences.contains("system_controller_mapping"),
+                "preview and disabled system mapping rows must be converged");
+
+        String client = read(repo.resolve(
+                "src/com/odin2/odinsettings/platform/AidlControllerHardwareAdapter.java"));
+        assertTrue(client.contains("com.ayn.controller.IOdinController/default"),
+                "controller client must use the fixed service instance");
+        assertTrue(client.contains("import com.ayn.controller.ControllerProfileResponse;"),
+                "controller client must use the generated response parcelable");
+        assertTrue(client.contains(
+                        "ControllerProfileResponse setResponse = service.setProfile(serviceProfile);")
+                        && client.contains(
+                                "ControllerProfileResponse getResponse = service.getProfile();"),
+                "set and get calls must retain their typed parcelable responses");
+        for (String field : new String[] {"result", "requestedProfile", "activeProfile"}) {
+            assertTrue(client.contains("setResponse." + field)
+                            && client.contains("getResponse." + field),
+                    "controller client must map parcelable field " + field);
+        }
+        assertFalse(client.contains("mapReadResult(service.getProfile())")
+                        || client.contains("mapSetResult(service.setProfile"),
+                "controller parcelables must never be passed to integer mappers");
+        assertFalse(client.contains("SystemProperties") || client.contains("/sys/")
+                        || client.contains("/proc/"),
+                "controller client must not bypass Binder with direct writes");
     }
 
     private static void assertLocaleConfig(Path repo) {
@@ -447,7 +484,7 @@ final class ResourceContractTest {
                 "requested fan mode restoration must use saved instance state");
 
         String blueprint = read(repo.resolve("Android.bp"));
-        assertTrue(blueprint.contains("static_libs: [\"com.ayn.fan-java\"]"),
+        assertTrue(blueprint.contains("\"com.ayn.fan-java\""),
                 "Odin Settings must depend on the private fan AIDL Java library");
 
         String aidlController = read(repo.resolve(

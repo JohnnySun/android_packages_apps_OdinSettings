@@ -10,6 +10,9 @@ import com.odin2.odinsettings.domain.ControllerScanCodeMapper;
 import com.odin2.odinsettings.hardware.AdapterCapability;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.AdapterStatus;
+import com.odin2.odinsettings.hardware.ControllerProfileDispatcher;
+import com.odin2.odinsettings.hardware.ControllerProfileResponseMapper;
+import com.odin2.odinsettings.hardware.ControllerProfileServiceContract;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
 import com.odin2.odinsettings.hardware.FanActualState;
 import com.odin2.odinsettings.hardware.FanApplyDispatcher;
@@ -51,6 +54,9 @@ public final class HostTestMain {
         recognizedDeviceStillFailsClosedWithoutAdapter();
         capabilityGatePreventsUnsupportedCalls();
         reviewedAdapterCanReceiveRecognizedProfile();
+        controllerServiceContractMapsProfilesAndExactResults();
+        controllerProfileRequiresConfirmedReadback();
+        controllerProfileDispatchesOffUiAndSuppressesStaleCallbacks();
         externalDisplayUsesTheSameIdentityAndCapabilityGates();
         controllerColdBootCycleIsBoundedAndFailClosed();
         fanModesAreStrictlyAllowlisted();
@@ -228,10 +234,160 @@ public final class HostTestMain {
         AdapterResult result = coordinator.apply(knownIdentity(),
                 ControllerProfiles.FLIPPED_FACE);
 
-        assertEquals(AdapterResult.Code.APPLIED, result.code, "recognized apply result");
+        assertEquals(AdapterResult.Code.OK, result.code, "recognized apply result");
         assertEquals(1, adapter.controllerCalls, "recognized adapter call count");
         assertEquals(ControllerProfiles.FLIPPED_FACE, adapter.lastProfile,
                 "profile passed to adapter");
+        pass();
+    }
+
+    private static void controllerServiceContractMapsProfilesAndExactResults() {
+        assertEquals(0, ControllerProfileServiceContract.toServiceProfile(
+                ControllerProfiles.STANDARD), "standard service value");
+        assertEquals(1, ControllerProfileServiceContract.toServiceProfile(
+                ControllerProfiles.FLIPPED_FACE), "flipped service value");
+        assertEquals(ControllerProfiles.STANDARD,
+                ControllerProfileServiceContract.fromServiceProfile(0),
+                "standard service profile");
+        assertEquals(ControllerProfiles.FLIPPED_FACE,
+                ControllerProfileServiceContract.fromServiceProfile(1),
+                "flipped service profile");
+
+        AdapterResult.Code[] expected = {
+                AdapterResult.Code.OK,
+                AdapterResult.Code.UNSUPPORTED_DEVICE,
+                AdapterResult.Code.INVALID_PROFILE,
+                AdapterResult.Code.BUSY,
+                AdapterResult.Code.STORE_READ_FAILED,
+                AdapterResult.Code.STORE_WRITE_FAILED,
+                AdapterResult.Code.NOT_INITIALIZED
+        };
+        for (int result = 0; result < expected.length; result++) {
+            assertEquals(expected[result], ControllerProfileResponseMapper.mapSetResponse(
+                    result,
+                    ControllerProfileServiceContract.PROFILE_STANDARD,
+                    ControllerProfileServiceContract.PROFILE_STANDARD,
+                    ControllerProfiles.STANDARD).code,
+                    "setProfile result " + result);
+        }
+        assertEquals(AdapterResult.Code.UNAVAILABLE,
+                ControllerProfileResponseMapper.mapSetResponse(
+                        99, 0, 0, ControllerProfiles.STANDARD).code,
+                "unknown setProfile result must fail closed");
+        assertEquals(AdapterResult.Code.STORE_READ_FAILED,
+                ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_STORE_READ_FAILED,
+                        ControllerProfileServiceContract.PROFILE_STANDARD,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE).code,
+                "getProfile must preserve its exact failure result");
+        assertEquals(ControllerProfiles.FLIPPED_FACE,
+                ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_STORE_READ_FAILED,
+                        ControllerProfileServiceContract.PROFILE_STANDARD,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE).actualProfile,
+                "getProfile failure must retain a usable active profile");
+        assertEquals(ControllerProfiles.STANDARD,
+                ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_STORE_READ_FAILED,
+                        ControllerProfileServiceContract.PROFILE_STANDARD,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE).requestedProfile,
+                "getProfile must preserve its requested profile field");
+        assertEquals(AdapterResult.Code.INVALID_PROFILE,
+                ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_OK, 0, 2).code,
+                "unknown active profile must not be guessed");
+        pass();
+    }
+
+    private static void controllerProfileRequiresConfirmedReadback() {
+        AdapterResult setOk = ControllerProfileResponseMapper.mapSetResponse(
+                ControllerProfileServiceContract.RESULT_OK,
+                ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                ControllerProfiles.FLIPPED_FACE);
+        AdapterResult confirmed = ControllerProfileResponseMapper.confirmReadback(
+                setOk, ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_OK,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE));
+        assertEquals(AdapterResult.Code.OK, confirmed.code,
+                "matching readback confirms profile");
+        assertEquals(ControllerProfiles.FLIPPED_FACE, confirmed.actualProfile,
+                "confirmed actual profile");
+
+        AdapterResult mismatch = ControllerProfileResponseMapper.confirmReadback(
+                setOk, ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_OK,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfileServiceContract.PROFILE_STANDARD));
+        assertEquals(AdapterResult.Code.READBACK_MISMATCH, mismatch.code,
+                "different readback must not claim success");
+        assertEquals(ControllerProfiles.STANDARD, mismatch.actualProfile,
+                "mismatch still reports actual profile");
+
+        AdapterResult unavailable = ControllerProfileResponseMapper.confirmReadback(
+                setOk, ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_NOT_INITIALIZED,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE, -1));
+        assertEquals(AdapterResult.Code.NOT_INITIALIZED, unavailable.code,
+                "missing readback must not claim success");
+
+        AdapterResult storeFailed = ControllerProfileResponseMapper.confirmReadback(
+                ControllerProfileResponseMapper.mapSetResponse(
+                        ControllerProfileServiceContract.RESULT_STORE_WRITE_FAILED,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfiles.FLIPPED_FACE),
+                ControllerProfileResponseMapper.mapReadResponse(
+                        ControllerProfileServiceContract.RESULT_OK,
+                        ControllerProfileServiceContract.PROFILE_FLIPPED_FACE,
+                        ControllerProfileServiceContract.PROFILE_STANDARD));
+        assertEquals(AdapterResult.Code.STORE_WRITE_FAILED, storeFailed.code,
+                "readback must preserve the precise set failure");
+        assertEquals(ControllerProfiles.STANDARD, storeFailed.actualProfile,
+                "failed set must still synchronize the actual profile");
+        pass();
+    }
+
+    private static void controllerProfileDispatchesOffUiAndSuppressesStaleCallbacks() {
+        ManualExecutor worker = new ManualExecutor();
+        ManualExecutor main = new ManualExecutor();
+        RecordingAdapter adapter = RecordingAdapter.forCapabilities(
+                AdapterCapability.CONTROLLER_PROFILE);
+        ControllerProfileCoordinator coordinator = new ControllerProfileCoordinator(
+                new HardwareAccessPolicy(), adapter);
+        ControllerProfileDispatcher dispatcher = new ControllerProfileDispatcher(worker, main);
+        final int[] callbacks = {0};
+
+        assertTrue(dispatcher.submitRead(coordinator, knownIdentity(),
+                new ControllerProfileDispatcher.Callback() {
+                    @Override
+                    public void onComplete(AdapterResult result) {
+                        callbacks[0] += 1;
+                    }
+                }), "controller read must be queued");
+        assertEquals(0, adapter.controllerReads,
+                "controller read must not run on the caller thread");
+        worker.runNext();
+        assertEquals(1, adapter.controllerReads, "controller worker read count");
+        assertEquals(0, callbacks[0], "callback must wait for main executor");
+        main.runNext();
+        assertEquals(1, callbacks[0], "callback must return on main executor");
+
+        assertTrue(dispatcher.submit(coordinator, knownIdentity(),
+                ControllerProfiles.FLIPPED_FACE,
+                new ControllerProfileDispatcher.Callback() {
+                    @Override
+                    public void onComplete(AdapterResult result) {
+                        callbacks[0] += 10;
+                    }
+                }), "controller write must be queued");
+        dispatcher.invalidateCallbacks();
+        worker.runNext();
+        assertEquals(0, main.size(), "stale controller callback must be suppressed");
+        assertEquals(1, callbacks[0], "stale callback must not update UI");
+        assertFalse(dispatcher.isPending(), "stale request must clear pending state");
+        dispatcher.close();
         pass();
     }
 
@@ -853,6 +1009,7 @@ public final class HostTestMain {
     private static final class RecordingAdapter implements HardwareAdapter {
         private final AdapterStatus status;
         private int controllerCalls;
+        private int controllerReads;
         private int displayCalls;
         private ControllerProfile lastProfile;
 
@@ -874,11 +1031,18 @@ public final class HostTestMain {
         }
 
         @Override
+        public AdapterResult readControllerProfile(DeviceIdentity identity) {
+            controllerReads += 1;
+            return AdapterResult.withProfile(AdapterResult.Code.OK,
+                    ControllerProfiles.STANDARD, "test read");
+        }
+
+        @Override
         public AdapterResult applyControllerProfile(DeviceIdentity identity,
                 ControllerProfile profile) {
             controllerCalls += 1;
             lastProfile = profile;
-            return AdapterResult.of(AdapterResult.Code.APPLIED, "test apply");
+            return AdapterResult.withProfile(AdapterResult.Code.OK, profile, "test apply");
         }
 
         @Override

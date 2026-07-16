@@ -5,7 +5,10 @@ android_app {
     certificate: "platform",
     privileged: true,
     platform_apis: true,
-    static_libs: ["com.ayn.fan-java"],
+    static_libs: [
+        "com.ayn.controller-java",
+        "com.ayn.fan-java",
+    ],
     manifest: "AndroidManifest.xml",
 }
 

@@ -5,17 +5,13 @@
             android:defaultValue="standard"
             android:entries="@array/controller_profile_entries"
             android:entryValues="@array/controller_profile_values"
-            android:key="preview_controller_profile"
-            android:summary="@string/preview_profile_summary"
-            android:title="@string/preview_profile_title" />
+            android:key="system_controller_profile"
+            android:summary="@string/controller_profile_reading_summary"
+            android:title="@string/system_mapping_title" />
         <Preference
             android:key="controller_input_test"
             android:summary="@string/controller_test_summary"
             android:title="@string/controller_test_title" />
-        <Preference
-            android:enabled="false"
-            android:key="system_controller_mapping"
-            android:title="@string/system_mapping_title" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/external_display_category">

@@ -14,6 +14,11 @@ public final class DisabledHardwareAdapter implements HardwareAdapter {
     }
 
     @Override
+    public AdapterResult readControllerProfile(DeviceIdentity identity) {
+        return AdapterResult.of(AdapterResult.Code.ADAPTER_UNAVAILABLE, DETAIL);
+    }
+
+    @Override
     public AdapterResult applyControllerProfile(DeviceIdentity identity,
             ControllerProfile profile) {
         return AdapterResult.of(AdapterResult.Code.ADAPTER_UNAVAILABLE, DETAIL);

@@ -13,10 +13,11 @@ The Android 16 increment currently provides:
 
 - `com.android.settings.action.EXTRA_SETTINGS` activity entry.
 - Immutable standard and flipped face-button controller profiles.
-- A local controller input tester that previews the selected profile without
-  injecting events or changing the system mapping.
+- A Binder-backed system controller profile control with confirmed readback.
+- A local controller input tester that previews the last confirmed system
+  profile without injecting events or changing the mapping itself.
 - A policy and privileged-adapter boundary that denies unknown devices and
-  remains unavailable even on recognized Odin hardware.
+  fails closed when the controller service or confirmed readback is unavailable.
 - Read-only external-display status and an allowlisted, fail-closed fan mode
   control for Off, Quiet, and Sport.
 - Fail-closed keep-screen-on and force-landscape quick settings tiles.

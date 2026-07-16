@@ -20,6 +20,22 @@ public final class ControllerProfileCoordinator {
     }
 
     public AdapterResult apply(DeviceIdentity identity, ControllerProfile profile) {
+        AdapterResult gate = evaluateAccess(identity);
+        if (gate != null) {
+            return gate;
+        }
+        return adapter.applyControllerProfile(identity, profile);
+    }
+
+    public AdapterResult read(DeviceIdentity identity) {
+        AdapterResult gate = evaluateAccess(identity);
+        if (gate != null) {
+            return gate;
+        }
+        return adapter.readControllerProfile(identity);
+    }
+
+    private AdapterResult evaluateAccess(DeviceIdentity identity) {
         AccessDecision decision = accessPolicy.evaluate(identity);
         if (!decision.allowed) {
             return AdapterResult.of(AdapterResult.Code.UNKNOWN_DEVICE, decision.reason);
@@ -34,6 +50,6 @@ public final class ControllerProfileCoordinator {
                     AdapterResult.Code.UNSUPPORTED_CAPABILITY,
                     "Adapter does not support controller profiles.");
         }
-        return adapter.applyControllerProfile(identity, profile);
+        return null;
     }
 }

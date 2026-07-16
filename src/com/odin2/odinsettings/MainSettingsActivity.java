@@ -14,6 +14,8 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 
 import com.odin2.odinsettings.hardware.AdapterStatus;
+import com.odin2.odinsettings.hardware.AdapterResult;
+import com.odin2.odinsettings.hardware.ControllerProfileDispatcher;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
 import com.odin2.odinsettings.hardware.FanActualState;
 import com.odin2.odinsettings.hardware.FanApplyDispatcher;
@@ -21,10 +23,15 @@ import com.odin2.odinsettings.hardware.FanControlResult;
 import com.odin2.odinsettings.hardware.FanController;
 import com.odin2.odinsettings.hardware.FanMode;
 import com.odin2.odinsettings.platform.AndroidDeviceIdentity;
+import com.odin2.odinsettings.platform.AidlControllerHardwareAdapter;
 import com.odin2.odinsettings.platform.ControllerNavigation;
+import com.odin2.odinsettings.platform.ControllerDisplayNames;
 import com.odin2.odinsettings.platform.AidlFanController;
-import com.odin2.odinsettings.policy.AccessDecision;
+import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
+import com.odin2.odinsettings.domain.ControllerProfile;
+import com.odin2.odinsettings.domain.ControllerProfiles;
+import com.odin2.odinsettings.service.ControllerProfileCoordinator;
 import com.odin2.odinsettings.widget.ControllerListPreference;
 
 import java.util.concurrent.Executor;
@@ -34,6 +41,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 public final class MainSettingsActivity extends PreferenceActivity {
     private static final String STATE_REQUESTED_FAN_MODE = "requested_fan_mode";
+    private static final ExecutorService PROFILE_WORKER = Executors.newSingleThreadExecutor();
     private static final ExecutorService FAN_WORKER = Executors.newSingleThreadExecutor();
 
     private ListView preferenceList;
@@ -41,6 +49,19 @@ public final class MainSettingsActivity extends PreferenceActivity {
     private boolean controllerFocusActive;
     private final FanController fanController = AidlFanController.getInstance();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final DeviceIdentity controllerIdentity = AndroidDeviceIdentity.current();
+    private final ControllerProfileCoordinator controllerProfileCoordinator =
+            new ControllerProfileCoordinator(new HardwareAccessPolicy(),
+                    AidlControllerHardwareAdapter.getInstance());
+    private final ControllerProfileDispatcher controllerProfileDispatcher =
+            new ControllerProfileDispatcher(PROFILE_WORKER, new Executor() {
+                @Override
+                public void execute(Runnable command) {
+                    if (!mainHandler.post(command)) {
+                        throw new RejectedExecutionException("Main thread is shutting down");
+                    }
+                }
+            });
     private final FanApplyDispatcher fanApplyDispatcher = new FanApplyDispatcher(
             FAN_WORKER, new Executor() {
                 @Override
@@ -51,6 +72,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
                 }
             });
     private ControllerListPreference fanModePreference;
+    private ControllerListPreference controllerProfilePreference;
     private FanMode lastRequestedMode;
 
     @Override
@@ -61,6 +83,15 @@ public final class MainSettingsActivity extends PreferenceActivity {
 
         Preference controllerTest = findPreference("controller_input_test");
         controllerTest.setIntent(new Intent(this, ControllerTestActivity.class));
+        controllerProfilePreference = (ControllerListPreference) findPreference(
+                "system_controller_profile");
+        controllerProfilePreference.setOnPreferenceChangeListener(
+                new Preference.OnPreferenceChangeListener() {
+                    @Override
+                    public boolean onPreferenceChange(Preference preference, Object newValue) {
+                        return applyControllerProfile(String.valueOf(newValue));
+                    }
+                });
         fanModePreference = (ControllerListPreference) findPreference("fan_mode");
         fanModePreference.setOnPreferenceChangeListener(
                 new Preference.OnPreferenceChangeListener() {
@@ -69,14 +100,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
                         return applyFanMode(String.valueOf(newValue));
                     }
                 });
-        AccessDecision identity = new HardwareAccessPolicy().evaluate(
-                AndroidDeviceIdentity.current());
         AdapterStatus adapter = new DisabledHardwareAdapter().status();
-
-        Preference systemMapping = findPreference("system_controller_mapping");
-        systemMapping.setSummary(identity.allowed
-                ? getString(R.string.system_mapping_unavailable_summary)
-                : getString(R.string.unrecognized_device_summary));
 
         Preference externalDisplay = findPreference("external_display_policy");
         externalDisplay.setSummary(adapter.available
@@ -90,11 +114,13 @@ public final class MainSettingsActivity extends PreferenceActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        updateControllerProfile();
         updateFanStatus();
     }
 
     @Override
     protected void onStop() {
+        controllerProfileDispatcher.invalidateCallbacks();
         fanApplyDispatcher.invalidateCallbacks();
         super.onStop();
     }
@@ -110,8 +136,137 @@ public final class MainSettingsActivity extends PreferenceActivity {
 
     @Override
     protected void onDestroy() {
+        controllerProfileDispatcher.close();
         fanApplyDispatcher.close();
         super.onDestroy();
+    }
+
+    private void updateControllerProfile() {
+        controllerProfilePreference.setEnabled(false);
+        controllerProfilePreference.setSummary(R.string.controller_profile_reading_summary);
+        boolean accepted = controllerProfileDispatcher.submitRead(
+                controllerProfileCoordinator, controllerIdentity,
+                new ControllerProfileDispatcher.Callback() {
+                    @Override
+                    public void onComplete(AdapterResult result) {
+                        if (isUiStale()) {
+                            return;
+                        }
+                        renderControllerProfile(result);
+                    }
+                });
+        if (!accepted) {
+            renderControllerProfile(AdapterResult.of(
+                    AdapterResult.Code.UNAVAILABLE, "Profile worker unavailable."));
+        }
+    }
+
+    private boolean applyControllerProfile(String value) {
+        final ControllerProfile requested;
+        if (ControllerProfiles.STANDARD_ID.equals(value)) {
+            requested = ControllerProfiles.STANDARD;
+        } else if (ControllerProfiles.FLIPPED_FACE_ID.equals(value)) {
+            requested = ControllerProfiles.FLIPPED_FACE;
+        } else {
+            renderControllerProfile(AdapterResult.of(
+                    AdapterResult.Code.INVALID_PROFILE, "Unknown profile preference."));
+            return false;
+        }
+
+        controllerProfilePreference.setEnabled(false);
+        controllerProfilePreference.setSummary(R.string.controller_profile_applying_summary);
+        boolean accepted = controllerProfileDispatcher.submit(
+                controllerProfileCoordinator, controllerIdentity, requested,
+                new ControllerProfileDispatcher.Callback() {
+                    @Override
+                    public void onComplete(AdapterResult result) {
+                        if (isUiStale()) {
+                            return;
+                        }
+                        renderControllerProfile(result);
+                    }
+                });
+        if (!accepted) {
+            renderControllerProfile(AdapterResult.forRequest(
+                    AdapterResult.Code.UNAVAILABLE, requested,
+                    "Profile worker unavailable."));
+        }
+        return false;
+    }
+
+    private void renderControllerProfile(AdapterResult result) {
+        if (result.hasProfile()) {
+            controllerProfilePreference.setValue(result.actualProfile.id);
+        }
+        controllerProfilePreference.setEnabled(controllerProfileCanRetry(result.code));
+        switch (result.code) {
+            case OK:
+                if (result.hasProfile()) {
+                    controllerProfilePreference.setSummary(getString(
+                            R.string.controller_profile_active_summary,
+                            getString(ControllerDisplayNames.profileName(
+                                    result.actualProfile))));
+                } else {
+                    controllerProfilePreference.setSummary(
+                            R.string.controller_profile_unavailable_summary);
+                    controllerProfilePreference.setEnabled(false);
+                }
+                break;
+            case UNKNOWN_DEVICE:
+                controllerProfilePreference.setSummary(R.string.unrecognized_device_summary);
+                break;
+            case UNSUPPORTED_DEVICE:
+            case UNSUPPORTED_CAPABILITY:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_unsupported_summary);
+                break;
+            case INVALID_PROFILE:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_invalid_summary);
+                break;
+            case BUSY:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_busy_summary);
+                break;
+            case STORE_READ_FAILED:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_store_read_failed_summary);
+                break;
+            case STORE_WRITE_FAILED:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_store_write_failed_summary);
+                break;
+            case NOT_INITIALIZED:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_not_initialized_summary);
+                break;
+            case READBACK_MISMATCH:
+                if (result.hasProfile()) {
+                    controllerProfilePreference.setSummary(getString(
+                            R.string.controller_profile_mismatch_summary,
+                            getString(ControllerDisplayNames.profileName(
+                                    result.actualProfile))));
+                } else {
+                    controllerProfilePreference.setSummary(
+                            R.string.controller_profile_unavailable_summary);
+                }
+                break;
+            case UNAVAILABLE:
+            case ADAPTER_UNAVAILABLE:
+            case REJECTED:
+            case APPLIED:
+                controllerProfilePreference.setSummary(
+                        R.string.controller_profile_unavailable_summary);
+                break;
+        }
+    }
+
+    private static boolean controllerProfileCanRetry(AdapterResult.Code code) {
+        return code == AdapterResult.Code.OK
+                || code == AdapterResult.Code.BUSY
+                || code == AdapterResult.Code.STORE_READ_FAILED
+                || code == AdapterResult.Code.STORE_WRITE_FAILED
+                || code == AdapterResult.Code.READBACK_MISMATCH;
     }
 
     private void restoreRequestedFanMode(Bundle savedInstanceState) {

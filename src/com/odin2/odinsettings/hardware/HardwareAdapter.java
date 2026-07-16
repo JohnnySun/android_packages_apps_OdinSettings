@@ -7,6 +7,8 @@ import com.odin2.odinsettings.policy.DeviceIdentity;
 public interface HardwareAdapter {
     AdapterStatus status();
 
+    AdapterResult readControllerProfile(DeviceIdentity identity);
+
     AdapterResult applyControllerProfile(DeviceIdentity identity, ControllerProfile profile);
 
     AdapterResult applyExternalDisplayPolicy(DeviceIdentity identity,
