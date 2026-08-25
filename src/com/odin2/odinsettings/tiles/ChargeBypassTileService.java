@@ -111,7 +111,10 @@ public final class ChargeBypassTileService extends TileService {
                     : Tile.STATE_INACTIVE);
             tile.setSubtitle(getString(ChargeDisplayNames.modeName(result.mode)));
         }
-        tile.setContentDescription(tile.getLabel() + " " + tile.getSubtitle());
+        // No content description is set here on purpose: the system builds one
+        // from the label and the state line, and concatenating them by hand
+        // would bake in a word order and a separator that do not survive
+        // translation.
         tile.updateTile();
     }
 
