@@ -95,4 +95,16 @@
     <string name="performance_mode_performance">效能</string>
     <string name="performance_mode_high">高效能</string>
     <string name="performance_status_initial_summary">已要求：無。效能狀態無法取得。</string>
+    <string name="battery_category">電池</string>
+    <string name="charge_mode_title">充電控制</string>
+    <string name="charge_mode_off">正常充電</string>
+    <string name="charge_mode_limit">保持在上限</string>
+    <string name="charge_mode_bypass">插著電時停止充電</string>
+    <string name="charge_status_initial_summary">無法取得充電狀態。</string>
+    <string name="charge_summary_off">電量 %1$d%%，正常充電。</string>
+    <string name="charge_summary_limit_holding">電量 %1$d%%，已暫停充電，低於 %2$d%% 時恢復。</string>
+    <string name="charge_summary_limit_charging">電量 %1$d%%，正在充電至 %2$d%%。</string>
+    <string name="charge_summary_bypass_holding">電量 %1$d%%，已停止充電，改由電源供應器供電。</string>
+    <string name="charge_summary_bypass_charging">電量 %1$d%%，低電量保護已解除限制，正在充電。</string>
+    <string name="tile_stop_charging">停止充電</string>
 </resources>

@@ -246,11 +246,12 @@ final class ResourceContractTest {
         assertEquals(resourceNames(repo.resolve("res/values/strings.xml"), "string"),
                 resourceNames(repo.resolve("res/" + locale + "/strings.xml"), "string"),
                 locale + " string resources");
+        // Driven by the translatable attribute rather than a list of names, so
+        // an array added later is covered without editing this test.
         Set<String> baseArrays = resourceNames(
                 repo.resolve("res/values/arrays.xml"), "string-array");
-        baseArrays.remove("controller_profile_values");
-        baseArrays.remove("fan_mode_values");
-        baseArrays.remove("performance_mode_values");
+        baseArrays.removeAll(untranslatableResourceNames(
+                repo.resolve("res/values/arrays.xml"), "string-array"));
         assertEquals(baseArrays,
                 resourceNames(repo.resolve("res/" + locale + "/arrays.xml"), "string-array"),
                 locale + " array resources");
@@ -276,6 +277,19 @@ final class ResourceContractTest {
         Set<String> names = new HashSet<>();
         for (int i = 0; i < resources.getLength(); i++) {
             names.add(((Element) resources.item(i)).getAttribute("name"));
+        }
+        return names;
+    }
+
+    private static Set<String> untranslatableResourceNames(Path path, String tagName) {
+        Document document = parse(path);
+        NodeList resources = document.getElementsByTagName(tagName);
+        Set<String> names = new HashSet<>();
+        for (int i = 0; i < resources.getLength(); i++) {
+            Element resource = (Element) resources.item(i);
+            if ("false".equals(resource.getAttribute("translatable"))) {
+                names.add(resource.getAttribute("name"));
+            }
         }
         return names;
     }

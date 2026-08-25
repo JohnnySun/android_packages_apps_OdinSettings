@@ -10,6 +10,10 @@ import com.odin2.odinsettings.domain.ControllerScanCodeMapper;
 import com.odin2.odinsettings.hardware.AdapterCapability;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.AdapterStatus;
+import com.odin2.odinsettings.hardware.ChargeBypassToggle;
+import com.odin2.odinsettings.hardware.ChargeControlResult;
+import com.odin2.odinsettings.hardware.ChargeMode;
+import com.odin2.odinsettings.hardware.ChargeResponseMapper;
 import com.odin2.odinsettings.hardware.ControllerProfileDispatcher;
 import com.odin2.odinsettings.hardware.ControllerProfileResponseMapper;
 import com.odin2.odinsettings.hardware.ControllerProfileServiceContract;
@@ -69,6 +73,9 @@ public final class HostTestMain {
         fanConnectionRetriesReadOnceAfterRemoteFailure();
         fanConnectionNeverRetriesSetMode();
         fanConnectionClearsTheDeadCachedService();
+        chargeResponseCarriesTheWholeSnapshot();
+        chargeFailuresCarryNoSnapshotAtAll();
+        chargeBypassToggleRestoresWhatItReplaced();
         ResourceContractTest.verify();
         pass();
 
@@ -786,6 +793,94 @@ public final class HostTestMain {
                 "death recipient must force a fresh service lookup");
         assertEquals(2, connector.connectCalls,
                 "dead cached service must not be reused");
+        pass();
+    }
+
+    private static void chargeResponseCarriesTheWholeSnapshot() {
+        ChargeControlResult holding = ChargeResponseMapper.map(
+                ChargeResponseMapper.RESULT_OK, ChargeMode.LIMIT.serviceValue,
+                ChargeResponseMapper.RESTRICTED_YES, 100, 80, 75, null);
+        assertTrue(holding.isAvailable(), "A confirmed status is available");
+        assertEquals(ChargeMode.LIMIT, holding.mode, "The reported mode is carried");
+        assertEquals(ChargeControlResult.Restriction.HOLDING, holding.restriction,
+                "A held charge is reported as held");
+        assertEquals(100, holding.capacityPercent, "The capacity is carried");
+        assertEquals(80, holding.stopPercent, "The stop threshold is carried");
+        assertEquals(75, holding.resumePercent, "The resume threshold is carried");
+
+        // A daemon that cannot read the capacity says so, and -1 must never
+        // reach the summary as a percentage.
+        ChargeControlResult unread = ChargeResponseMapper.map(
+                ChargeResponseMapper.RESULT_OK, ChargeMode.OFF.serviceValue,
+                ChargeResponseMapper.RESTRICTED_UNKNOWN, -1, -1, -1, null);
+        assertTrue(unread.isAvailable(), "An unread capacity is not a failed call");
+        assertFalse(unread.hasCapacity(), "An unread capacity is reported as absent");
+        assertFalse(unread.hasThresholds(), "Unread thresholds are reported as absent");
+        assertEquals(ChargeControlResult.Restriction.UNKNOWN, unread.restriction,
+                "An unknown restriction is not the same as not restricted");
+
+        // Out of range is treated exactly like unread rather than shown.
+        assertFalse(ChargeResponseMapper.map(ChargeResponseMapper.RESULT_OK,
+                ChargeMode.OFF.serviceValue, ChargeResponseMapper.RESTRICTED_NO,
+                101, -1, -1, null).hasCapacity(),
+                "An impossible capacity is refused");
+
+        // A mode this build does not know is never guessed at.
+        assertFalse(ChargeResponseMapper.map(ChargeResponseMapper.RESULT_OK, 7,
+                ChargeResponseMapper.RESTRICTED_NO, 50, 80, 75, null).isAvailable(),
+                "An unknown mode is not reported as available");
+        pass();
+    }
+
+    private static void chargeFailuresCarryNoSnapshotAtAll() {
+        int[] failures = {
+            ChargeResponseMapper.RESULT_UNSUPPORTED_DEVICE,
+            ChargeResponseMapper.RESULT_UNEXPECTED_PATHS,
+            ChargeResponseMapper.RESULT_INVALID_MODE,
+            ChargeResponseMapper.RESULT_IO_ERROR,
+            ChargeResponseMapper.RESULT_CAPACITY_UNAVAILABLE,
+        };
+        for (int failure : failures) {
+            ChargeControlResult result = ChargeResponseMapper.map(failure,
+                    ChargeMode.LIMIT.serviceValue, ChargeResponseMapper.RESTRICTED_YES,
+                    100, 80, 75, ChargeMode.LIMIT);
+            assertFalse(result.isAvailable(), "A failure is never available");
+            assertFalse(result.hasCapacity(),
+                    "A failure never carries a capacity it did not confirm");
+            assertFalse(result.hasThresholds(),
+                    "A failure never carries thresholds it did not confirm");
+            assertEquals(ChargeControlResult.Restriction.UNKNOWN, result.restriction,
+                    "A failure never claims to know the restriction");
+        }
+        pass();
+    }
+
+    private static void chargeBypassToggleRestoresWhatItReplaced() {
+        ChargeBypassToggle.Decision on = ChargeBypassToggle.toggle(ChargeMode.LIMIT, null);
+        assertEquals(ChargeMode.BYPASS, on.target, "Switching on asks for bypass");
+        assertEquals(ChargeMode.LIMIT, on.remember, "The replaced mode is remembered");
+
+        ChargeBypassToggle.Decision off =
+                ChargeBypassToggle.toggle(ChargeMode.BYPASS, ChargeMode.LIMIT);
+        assertEquals(ChargeMode.LIMIT, off.target, "Switching off restores what it replaced");
+        assertTrue(off.remember == null, "The memory is cleared once it is spent");
+
+        // Nothing remembered falls back to charging normally rather than
+        // imposing a limit the owner never chose.
+        assertEquals(ChargeMode.OFF,
+                ChargeBypassToggle.toggle(ChargeMode.BYPASS, null).target,
+                "An empty memory falls back to charging normally");
+        // A memory of bypass would make the tile do nothing, so it is ignored.
+        assertEquals(ChargeMode.OFF,
+                ChargeBypassToggle.toggle(ChargeMode.BYPASS, ChargeMode.BYPASS).target,
+                "A stale bypass memory cannot make the tile a no-op");
+
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                ChargeBypassToggle.toggle(null, ChargeMode.OFF);
+            }
+        }, "A toggle without a confirmed current mode is refused");
         pass();
     }
 

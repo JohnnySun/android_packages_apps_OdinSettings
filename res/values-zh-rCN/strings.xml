@@ -95,4 +95,16 @@
     <string name="performance_mode_performance">性能</string>
     <string name="performance_mode_high">高性能</string>
     <string name="performance_status_initial_summary">已请求：无。性能状态不可用。</string>
+    <string name="battery_category">电池</string>
+    <string name="charge_mode_title">充电控制</string>
+    <string name="charge_mode_off">正常充电</string>
+    <string name="charge_mode_limit">保持在上限</string>
+    <string name="charge_mode_bypass">插着电时停止充电</string>
+    <string name="charge_status_initial_summary">无法获取充电状态。</string>
+    <string name="charge_summary_off">电量 %1$d%%，正常充电。</string>
+    <string name="charge_summary_limit_holding">电量 %1$d%%，已暂停充电，低于 %2$d%% 时恢复。</string>
+    <string name="charge_summary_limit_charging">电量 %1$d%%，正在充电至 %2$d%%。</string>
+    <string name="charge_summary_bypass_holding">电量 %1$d%%，已停止充电，改由电源适配器供电。</string>
+    <string name="charge_summary_bypass_charging">电量 %1$d%%，低电量保护已解除限制，正在充电。</string>
+    <string name="tile_stop_charging">停止充电</string>
 </resources>

@@ -21,6 +21,16 @@
             android:title="@string/external_display_policy_title" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/battery_category">
+        <com.odin2.odinsettings.widget.ControllerListPreference
+            android:entries="@array/charge_mode_entries"
+            android:entryValues="@array/charge_mode_values"
+            android:key="charge_mode"
+            android:persistent="false"
+            android:summary="@string/charge_status_initial_summary"
+            android:title="@string/charge_mode_title" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/hardware_controls_category">
         <com.odin2.odinsettings.widget.ControllerListPreference
             android:entries="@array/fan_mode_entries"

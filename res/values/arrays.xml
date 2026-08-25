@@ -29,4 +29,14 @@
         <item>performance</item>
         <item>high</item>
     </string-array>
+    <string-array name="charge_mode_entries">
+        <item>@string/charge_mode_off</item>
+        <item>@string/charge_mode_limit</item>
+        <item>@string/charge_mode_bypass</item>
+    </string-array>
+    <string-array name="charge_mode_values" translatable="false">
+        <item>off</item>
+        <item>limit</item>
+        <item>bypass</item>
+    </string-array>
 </resources>

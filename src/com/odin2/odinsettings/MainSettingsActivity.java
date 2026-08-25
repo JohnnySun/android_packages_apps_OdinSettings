@@ -14,6 +14,9 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 
 import com.odin2.odinsettings.hardware.AdapterStatus;
+import com.odin2.odinsettings.hardware.ChargeControlResult;
+import com.odin2.odinsettings.hardware.ChargeController;
+import com.odin2.odinsettings.hardware.ChargeMode;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.ControllerProfileDispatcher;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
@@ -29,6 +32,7 @@ import com.odin2.odinsettings.platform.ControllerDisplayNames;
 import com.odin2.odinsettings.hardware.PerformanceControlResult;
 import com.odin2.odinsettings.hardware.PerformanceController;
 import com.odin2.odinsettings.hardware.PerformanceMode;
+import com.odin2.odinsettings.platform.AidlChargeController;
 import com.odin2.odinsettings.platform.AidlFanController;
 import com.odin2.odinsettings.platform.AidlPerformanceController;
 import com.odin2.odinsettings.policy.DeviceIdentity;
@@ -49,6 +53,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
     private static final ExecutorService FAN_WORKER = Executors.newSingleThreadExecutor();
     private static final ExecutorService PERFORMANCE_WORKER =
             Executors.newSingleThreadExecutor();
+    private static final ExecutorService CHARGE_WORKER = Executors.newSingleThreadExecutor();
 
     private ListView preferenceList;
     private int lastFocusedPosition = ListView.INVALID_POSITION;
@@ -58,6 +63,9 @@ public final class MainSettingsActivity extends PreferenceActivity {
             AidlPerformanceController.getInstance();
     private ControllerListPreference performanceModePreference;
     private PerformanceMode lastRequestedPerformanceMode;
+    private final ChargeController chargeController = AidlChargeController.getInstance();
+    private ControllerListPreference chargeModePreference;
+    private ChargeMode lastRequestedChargeMode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final DeviceIdentity controllerIdentity = AndroidDeviceIdentity.current();
     private final ControllerProfileCoordinator controllerProfileCoordinator =
@@ -122,6 +130,17 @@ public final class MainSettingsActivity extends PreferenceActivity {
                         }
                     });
         }
+        chargeModePreference = (ControllerListPreference) findPreference("charge_mode");
+        if (chargeModePreference != null) {
+            chargeModePreference.setOnPreferenceChangeListener(
+                    new Preference.OnPreferenceChangeListener() {
+                        @Override
+                        public boolean onPreferenceChange(Preference preference,
+                                Object newValue) {
+                            return applyChargeMode(String.valueOf(newValue));
+                        }
+                    });
+        }
         AdapterStatus adapter = new DisabledHardwareAdapter().status();
 
         Preference externalDisplay = findPreference("external_display_policy");
@@ -139,6 +158,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
         updateControllerProfile();
         updateFanStatus();
         updatePerformanceStatus();
+        updateChargeStatus();
     }
 
     @Override
@@ -398,6 +418,127 @@ public final class MainSettingsActivity extends PreferenceActivity {
             case SYSTEM_MANAGED:
             default:
                 return R.string.performance_mode_system;
+        }
+    }
+
+    private boolean applyChargeMode(String preferenceValue) {
+        if (chargeModePreference == null) {
+            return false;
+        }
+        final ChargeMode requested;
+        try {
+            requested = ChargeMode.fromPreferenceValue(preferenceValue);
+        } catch (IllegalArgumentException rejected) {
+            // An unknown value never reaches the daemon.
+            return false;
+        }
+        lastRequestedChargeMode = requested;
+        chargeModePreference.setEnabled(false);
+        submitCharge(new ChargeWork() {
+            @Override
+            public ChargeControlResult run() {
+                return chargeController.apply(requested);
+            }
+        });
+        // The row re-renders from what the daemon reports, not from the tap, so
+        // a refused mode does not leave the UI claiming it was applied.
+        return false;
+    }
+
+    private void updateChargeStatus() {
+        if (chargeModePreference == null) {
+            return;
+        }
+        chargeModePreference.setEnabled(false);
+        submitCharge(new ChargeWork() {
+            @Override
+            public ChargeControlResult run() {
+                return chargeController.read();
+            }
+        });
+    }
+
+    private interface ChargeWork {
+        ChargeControlResult run();
+    }
+
+    private void submitCharge(final ChargeWork work) {
+        try {
+            CHARGE_WORKER.execute(new Runnable() {
+                @Override
+                public void run() {
+                    final ChargeControlResult result = work.run();
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isUiStale() && chargeModePreference != null) {
+                                chargeModePreference.setEnabled(true);
+                                renderChargeStatus(result);
+                            }
+                        }
+                    });
+                }
+            });
+        } catch (RejectedExecutionException rejected) {
+            chargeModePreference.setEnabled(true);
+            renderChargeStatus(ChargeControlResult.failure(
+                    ChargeControlResult.Code.UNAVAILABLE, lastRequestedChargeMode));
+        }
+    }
+
+    private void renderChargeStatus(ChargeControlResult result) {
+        if (chargeModePreference == null || result == null) {
+            return;
+        }
+        if (!result.isAvailable()) {
+            chargeModePreference.setSummary(
+                    getString(R.string.charge_status_initial_summary));
+            return;
+        }
+        chargeModePreference.setValue(result.mode.preferenceValue);
+        chargeModePreference.setSummary(chargeSummary(result));
+    }
+
+    /**
+     * Falls back to the plain mode label whenever the daemon could not read the
+     * capacity, rather than printing a number it did not have.
+     */
+    private String chargeSummary(ChargeControlResult result) {
+        if (!result.hasCapacity()) {
+            return getString(chargeModeLabel(result.mode));
+        }
+        boolean holding = result.restriction == ChargeControlResult.Restriction.HOLDING;
+        switch (result.mode) {
+            case LIMIT:
+                if (!result.hasThresholds()) {
+                    return getString(chargeModeLabel(result.mode));
+                }
+                return holding
+                        ? getString(R.string.charge_summary_limit_holding,
+                                result.capacityPercent, result.resumePercent)
+                        : getString(R.string.charge_summary_limit_charging,
+                                result.capacityPercent, result.stopPercent);
+            case BYPASS:
+                return holding
+                        ? getString(R.string.charge_summary_bypass_holding,
+                                result.capacityPercent)
+                        : getString(R.string.charge_summary_bypass_charging,
+                                result.capacityPercent);
+            case OFF:
+            default:
+                return getString(R.string.charge_summary_off, result.capacityPercent);
+        }
+    }
+
+    private static int chargeModeLabel(ChargeMode mode) {
+        switch (mode) {
+            case LIMIT:
+                return R.string.charge_mode_limit;
+            case BYPASS:
+                return R.string.charge_mode_bypass;
+            case OFF:
+            default:
+                return R.string.charge_mode_off;
         }
     }
 
