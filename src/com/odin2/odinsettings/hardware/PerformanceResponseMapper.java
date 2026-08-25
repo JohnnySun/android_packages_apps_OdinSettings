@@ -17,9 +17,13 @@ public final class PerformanceResponseMapper {
     public static final int RESULT_INVALID_MODE = 5;
     public static final int RESULT_READ_FAILED = 6;
     public static final int RESULT_WRITE_FAILED = 7;
+    public static final int RESULT_READBACK_FAILED = 8;
+    public static final int RESULT_ROLLBACK_FAILED = 9;
+    public static final int RESULT_MODE_UNAVAILABLE = 10;
 
     private PerformanceResponseMapper() {}
 
+    /** serviceMode is the mode actually in effect, not the one requested. */
     public static PerformanceControlResult map(int result, int serviceMode,
             PerformanceMode requested) {
         PerformanceMode reported = null;
@@ -55,6 +59,15 @@ public final class PerformanceResponseMapper {
             case RESULT_WRITE_FAILED:
                 return PerformanceControlResult.failure(
                         PerformanceControlResult.Code.WRITE_FAILED, reported);
+            case RESULT_READBACK_FAILED:
+                return PerformanceControlResult.failure(
+                        PerformanceControlResult.Code.READBACK_FAILED, reported);
+            case RESULT_ROLLBACK_FAILED:
+                return PerformanceControlResult.failure(
+                        PerformanceControlResult.Code.ROLLBACK_FAILED, reported);
+            case RESULT_MODE_UNAVAILABLE:
+                return PerformanceControlResult.failure(
+                        PerformanceControlResult.Code.MODE_UNAVAILABLE, reported);
             default:
                 return PerformanceControlResult.failure(
                         PerformanceControlResult.Code.UNAVAILABLE, reported);

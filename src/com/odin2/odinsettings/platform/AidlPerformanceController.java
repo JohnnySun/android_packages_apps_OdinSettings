@@ -36,7 +36,7 @@ public final class AidlPerformanceController implements PerformanceController {
                         throw remoteFailure("getStatus returned nothing", null);
                     }
                     return PerformanceResponseMapper.map(
-                            response.result, response.mode, null);
+                            response.result, response.activeMode, null);
                 } catch (RemoteException exception) {
                     throw remoteFailure("getStatus failed", exception);
                 }
@@ -59,7 +59,7 @@ public final class AidlPerformanceController implements PerformanceController {
                         throw remoteFailure("setMode returned nothing", null);
                     }
                     return PerformanceResponseMapper.map(
-                            response.result, response.mode, mode);
+                            response.result, response.activeMode, mode);
                 } catch (RemoteException exception) {
                     throw remoteFailure("setMode outcome is unknown", exception);
                 }

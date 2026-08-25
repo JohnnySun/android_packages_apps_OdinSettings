@@ -11,6 +11,9 @@ public final class PerformanceControlResult {
         INVALID_MODE,
         READ_FAILED,
         WRITE_FAILED,
+        READBACK_FAILED,
+        ROLLBACK_FAILED,
+        MODE_UNAVAILABLE,
     }
 
     public final Code code;
