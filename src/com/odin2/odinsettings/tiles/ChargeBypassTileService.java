@@ -11,7 +11,9 @@ import com.odin2.odinsettings.hardware.ChargeBypassToggle;
 import com.odin2.odinsettings.hardware.ChargeControlResult;
 import com.odin2.odinsettings.hardware.ChargeController;
 import com.odin2.odinsettings.hardware.ChargeMode;
+import com.odin2.odinsettings.R;
 import com.odin2.odinsettings.platform.AidlChargeController;
+import com.odin2.odinsettings.platform.ChargeDisplayNames;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -95,13 +97,21 @@ public final class ChargeBypassTileService extends TileService {
         if (tile == null) {
             return;
         }
+        // The label and the state line are set on every update rather than left
+        // to the manifest. Without them the tile renders as a bare icon with no
+        // text at all, which is how it shipped first and how it was impossible
+        // to find in a shade full of labelled tiles.
+        tile.setLabel(getString(R.string.tile_stop_charging));
         if (result == null || !result.isAvailable()) {
             tile.setState(Tile.STATE_UNAVAILABLE);
+            tile.setSubtitle(getString(R.string.tile_stop_charging_unavailable));
         } else {
             tile.setState(result.mode == ChargeMode.BYPASS
                     ? Tile.STATE_ACTIVE
                     : Tile.STATE_INACTIVE);
+            tile.setSubtitle(getString(ChargeDisplayNames.modeName(result.mode)));
         }
+        tile.setContentDescription(tile.getLabel() + " " + tile.getSubtitle());
         tile.updateTile();
     }
 

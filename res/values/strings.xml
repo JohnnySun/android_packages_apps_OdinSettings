@@ -107,4 +107,5 @@
     <string name="charge_summary_bypass_holding">Battery %1$d%%. Charging stopped, running from the adapter.</string>
     <string name="charge_summary_bypass_charging">Battery %1$d%%. Charging: the low battery floor released the hold.</string>
     <string name="tile_stop_charging">Stop charging</string>
+    <string name="tile_stop_charging_unavailable">Unavailable</string>
 </resources>

@@ -107,4 +107,5 @@
     <string name="charge_summary_bypass_holding">电量 %1$d%%，已停止充电，改由电源适配器供电。</string>
     <string name="charge_summary_bypass_charging">电量 %1$d%%，低电量保护已解除限制，正在充电。</string>
     <string name="tile_stop_charging">停止充电</string>
+    <string name="tile_stop_charging_unavailable">无法使用</string>
 </resources>

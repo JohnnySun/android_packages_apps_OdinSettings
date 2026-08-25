@@ -23,6 +23,8 @@ final class ResourceContractTest {
         assertLocaleConfig(repo);
         assertDiscoverableEntrypoints(repo);
         assertLocaleMatches(repo, "values-zh-rTW");
+        assertTilesCarryText(repo.resolve(
+                "src/com/odin2/odinsettings/tiles/ChargeBypassTileService.java"));
         assertListSummariesAreNotReformatted(repo.resolve(
                 "src/com/odin2/odinsettings/widget/ControllerListPreference.java"));
         assertLocaleMatches(repo, "values-zh-rCN");
@@ -309,6 +311,19 @@ final class ResourceContractTest {
                         + " reformatting an already formatted summary");
         assertTrue(source.contains("public void setSummary(CharSequence summary)"),
                 "ControllerListPreference must capture the summary it is given verbatim");
+    }
+
+    /**
+     * A quick settings tile that sets only its state renders as a bare icon with
+     * no text, in a shade where every system tile carries a label and a state
+     * line. That shipped once and the owner could not find the control.
+     */
+    private static void assertTilesCarryText(Path tilePath) {
+        String source = read(tilePath);
+        assertTrue(source.contains("setLabel("),
+                "a working tile must set its label on every update");
+        assertTrue(source.contains("setSubtitle("),
+                "a working tile must set the state line the system tiles all have");
     }
 
     private static void assertControllerLabelsAreLocalized(Path activityPath) {

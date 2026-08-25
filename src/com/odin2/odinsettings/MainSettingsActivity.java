@@ -33,6 +33,7 @@ import com.odin2.odinsettings.hardware.PerformanceControlResult;
 import com.odin2.odinsettings.hardware.PerformanceController;
 import com.odin2.odinsettings.hardware.PerformanceMode;
 import com.odin2.odinsettings.platform.AidlChargeController;
+import com.odin2.odinsettings.platform.ChargeDisplayNames;
 import com.odin2.odinsettings.platform.AidlFanController;
 import com.odin2.odinsettings.platform.AidlPerformanceController;
 import com.odin2.odinsettings.policy.DeviceIdentity;
@@ -505,13 +506,13 @@ public final class MainSettingsActivity extends PreferenceActivity {
      */
     private String chargeSummary(ChargeControlResult result) {
         if (!result.hasCapacity()) {
-            return getString(chargeModeLabel(result.mode));
+            return getString(ChargeDisplayNames.modeName(result.mode));
         }
         boolean holding = result.restriction == ChargeControlResult.Restriction.HOLDING;
         switch (result.mode) {
             case LIMIT:
                 if (!result.hasThresholds()) {
-                    return getString(chargeModeLabel(result.mode));
+                    return getString(ChargeDisplayNames.modeName(result.mode));
                 }
                 return holding
                         ? getString(R.string.charge_summary_limit_holding,
@@ -527,18 +528,6 @@ public final class MainSettingsActivity extends PreferenceActivity {
             case OFF:
             default:
                 return getString(R.string.charge_summary_off, result.capacityPercent);
-        }
-    }
-
-    private static int chargeModeLabel(ChargeMode mode) {
-        switch (mode) {
-            case LIMIT:
-                return R.string.charge_mode_limit;
-            case BYPASS:
-                return R.string.charge_mode_bypass;
-            case OFF:
-            default:
-                return R.string.charge_mode_off;
         }
     }
 
