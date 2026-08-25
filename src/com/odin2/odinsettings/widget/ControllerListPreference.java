@@ -14,12 +14,34 @@ import android.widget.ListView;
 import com.odin2.odinsettings.platform.ControllerNavigation;
 
 public final class ControllerListPreference extends ListPreference {
+    // AOSP's ListPreference.getSummary runs the summary back through
+    // String.format with the selected entry as the argument. Every summary here
+    // is already formatted in Java before it is set and none of them wants the
+    // entry substituted in, so that second pass can only do harm: a summary
+    // carrying a literal percent sign — a battery level, say — throws
+    // UnknownFormatConversionException while the list is laying out and takes
+    // the activity down. The summary is kept verbatim instead.
+    private CharSequence literalSummary;
+
     public ControllerListPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
+        literalSummary = super.getSummary();
     }
 
     public ControllerListPreference(Context context) {
         super(context);
+        literalSummary = super.getSummary();
+    }
+
+    @Override
+    public void setSummary(CharSequence summary) {
+        literalSummary = summary;
+        super.setSummary(summary);
+    }
+
+    @Override
+    public CharSequence getSummary() {
+        return literalSummary != null ? literalSummary : super.getSummary();
     }
 
     @Override

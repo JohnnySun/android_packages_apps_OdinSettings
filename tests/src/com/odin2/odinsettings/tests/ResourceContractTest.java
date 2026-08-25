@@ -23,6 +23,8 @@ final class ResourceContractTest {
         assertLocaleConfig(repo);
         assertDiscoverableEntrypoints(repo);
         assertLocaleMatches(repo, "values-zh-rTW");
+        assertListSummariesAreNotReformatted(repo.resolve(
+                "src/com/odin2/odinsettings/widget/ControllerListPreference.java"));
         assertLocaleMatches(repo, "values-zh-rCN");
         assertStableControllerProfileValues(repo.resolve("res/values/arrays.xml"));
         assertSystemControllerProfileClient(repo);
@@ -292,6 +294,21 @@ final class ResourceContractTest {
             }
         }
         return names;
+    }
+
+    /**
+     * A summary that reaches a list row already formatted must not be formatted
+     * again. AOSP's ListPreference does exactly that, and a summary carrying a
+     * literal percent sign then throws while the list lays out. This crashed
+     * the activity once; the widget has to keep neutralizing it.
+     */
+    private static void assertListSummariesAreNotReformatted(Path widgetPath) {
+        String source = read(widgetPath);
+        assertTrue(source.contains("public CharSequence getSummary()"),
+                "ControllerListPreference must override getSummary to stop AOSP"
+                        + " reformatting an already formatted summary");
+        assertTrue(source.contains("public void setSummary(CharSequence summary)"),
+                "ControllerListPreference must capture the summary it is given verbatim");
     }
 
     private static void assertControllerLabelsAreLocalized(Path activityPath) {
