@@ -6,8 +6,10 @@ android_app {
     privileged: true,
     platform_apis: true,
     static_libs: [
+        "com.ayn.charge-java",
         "com.ayn.controller-java",
         "com.ayn.fan-java",
+        "com.ayn.performance-java",
     ],
     manifest: "AndroidManifest.xml",
 }
