@@ -39,9 +39,9 @@ public final class OdinControlRegistry {
             new OdinControl(
                     "performance_mode",
                     "Performance mode",
-                    "expected_unmapped",
-                    "Candidate setting key observed; thermal or power path still unknown.",
-                    "Show a disabled/read-only settings row while stock UI labels, provider keys, and before/after evidence are mapped.",
+                    "live_private_service",
+                    "Thermal path proven 2026-08-25: the framework reads real temperatures through the AIDL provider and the fan tracks a sustained load without throttling.",
+                    "Offer the three stock modes through the private performance Binder service; the row re-renders from what the daemon reports rather than from the tap.",
                     new String[] {
                             "settings/system/performance_mode",
                             "settings/system/is_quick_set_performance_and_fan_enable"}),

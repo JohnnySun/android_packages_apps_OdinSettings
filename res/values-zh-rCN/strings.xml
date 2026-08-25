@@ -89,4 +89,10 @@
     <string name="controller_button_dpad_down">方向键下</string>
     <string name="controller_button_dpad_left">方向键左</string>
     <string name="controller_button_dpad_right">方向键右</string>
+    <string name="performance_mode_title">性能模式</string>
+    <string name="performance_mode_system">系统托管</string>
+    <string name="performance_mode_normal">标准</string>
+    <string name="performance_mode_performance">性能</string>
+    <string name="performance_mode_high">高性能</string>
+    <string name="performance_status_initial_summary">已请求：无。性能状态不可用。</string>
 </resources>

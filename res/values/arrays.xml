@@ -17,4 +17,16 @@
         <item>quiet</item>
         <item>sport</item>
     </string-array>
+    <string-array name="performance_mode_entries">
+        <item>@string/performance_mode_system</item>
+        <item>@string/performance_mode_normal</item>
+        <item>@string/performance_mode_performance</item>
+        <item>@string/performance_mode_high</item>
+    </string-array>
+    <string-array name="performance_mode_values" translatable="false">
+        <item>system</item>
+        <item>normal</item>
+        <item>performance</item>
+        <item>high</item>
+    </string-array>
 </resources>

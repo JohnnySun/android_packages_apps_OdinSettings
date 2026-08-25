@@ -26,7 +26,11 @@ import com.odin2.odinsettings.platform.AndroidDeviceIdentity;
 import com.odin2.odinsettings.platform.AidlControllerHardwareAdapter;
 import com.odin2.odinsettings.platform.ControllerNavigation;
 import com.odin2.odinsettings.platform.ControllerDisplayNames;
+import com.odin2.odinsettings.hardware.PerformanceControlResult;
+import com.odin2.odinsettings.hardware.PerformanceController;
+import com.odin2.odinsettings.hardware.PerformanceMode;
 import com.odin2.odinsettings.platform.AidlFanController;
+import com.odin2.odinsettings.platform.AidlPerformanceController;
 import com.odin2.odinsettings.policy.DeviceIdentity;
 import com.odin2.odinsettings.policy.HardwareAccessPolicy;
 import com.odin2.odinsettings.domain.ControllerProfile;
@@ -43,11 +47,17 @@ public final class MainSettingsActivity extends PreferenceActivity {
     private static final String STATE_REQUESTED_FAN_MODE = "requested_fan_mode";
     private static final ExecutorService PROFILE_WORKER = Executors.newSingleThreadExecutor();
     private static final ExecutorService FAN_WORKER = Executors.newSingleThreadExecutor();
+    private static final ExecutorService PERFORMANCE_WORKER =
+            Executors.newSingleThreadExecutor();
 
     private ListView preferenceList;
     private int lastFocusedPosition = ListView.INVALID_POSITION;
     private boolean controllerFocusActive;
     private final FanController fanController = AidlFanController.getInstance();
+    private final PerformanceController performanceController =
+            AidlPerformanceController.getInstance();
+    private ControllerListPreference performanceModePreference;
+    private PerformanceMode lastRequestedPerformanceMode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final DeviceIdentity controllerIdentity = AndroidDeviceIdentity.current();
     private final ControllerProfileCoordinator controllerProfileCoordinator =
@@ -100,6 +110,18 @@ public final class MainSettingsActivity extends PreferenceActivity {
                         return applyFanMode(String.valueOf(newValue));
                     }
                 });
+        performanceModePreference =
+                (ControllerListPreference) findPreference("performance_mode");
+        if (performanceModePreference != null) {
+            performanceModePreference.setOnPreferenceChangeListener(
+                    new Preference.OnPreferenceChangeListener() {
+                        @Override
+                        public boolean onPreferenceChange(Preference preference,
+                                Object newValue) {
+                            return applyPerformanceMode(String.valueOf(newValue));
+                        }
+                    });
+        }
         AdapterStatus adapter = new DisabledHardwareAdapter().status();
 
         Preference externalDisplay = findPreference("external_display_policy");
@@ -116,6 +138,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
         super.onResume();
         updateControllerProfile();
         updateFanStatus();
+        updatePerformanceStatus();
     }
 
     @Override
@@ -281,6 +304,100 @@ public final class MainSettingsActivity extends PreferenceActivity {
             lastRequestedMode = FanMode.fromPreferenceValue(savedMode);
         } catch (IllegalArgumentException exception) {
             lastRequestedMode = null;
+        }
+    }
+
+    private boolean applyPerformanceMode(String preferenceValue) {
+        if (performanceModePreference == null) {
+            return false;
+        }
+        final PerformanceMode requested;
+        try {
+            requested = PerformanceMode.fromPreferenceValue(preferenceValue);
+        } catch (IllegalArgumentException rejected) {
+            // An unknown value never reaches the daemon.
+            return false;
+        }
+        lastRequestedPerformanceMode = requested;
+        performanceModePreference.setEnabled(false);
+        submitPerformance(new PerformanceWork() {
+            @Override
+            public PerformanceControlResult run() {
+                return performanceController.apply(requested);
+            }
+        });
+        // The row re-renders from what the daemon reports, not from the tap, so
+        // a refused mode does not leave the UI claiming it was applied.
+        return false;
+    }
+
+    private void updatePerformanceStatus() {
+        if (performanceModePreference == null) {
+            return;
+        }
+        performanceModePreference.setEnabled(false);
+        submitPerformance(new PerformanceWork() {
+            @Override
+            public PerformanceControlResult run() {
+                return performanceController.read();
+            }
+        });
+    }
+
+    private interface PerformanceWork {
+        PerformanceControlResult run();
+    }
+
+    private void submitPerformance(final PerformanceWork work) {
+        try {
+            PERFORMANCE_WORKER.execute(new Runnable() {
+                @Override
+                public void run() {
+                    final PerformanceControlResult result = work.run();
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isUiStale() && performanceModePreference != null) {
+                                performanceModePreference.setEnabled(true);
+                                renderPerformanceStatus(result);
+                            }
+                        }
+                    });
+                }
+            });
+        } catch (RejectedExecutionException rejected) {
+            performanceModePreference.setEnabled(true);
+            renderPerformanceStatus(PerformanceControlResult.failure(
+                    PerformanceControlResult.Code.UNAVAILABLE,
+                    lastRequestedPerformanceMode));
+        }
+    }
+
+    private void renderPerformanceStatus(PerformanceControlResult result) {
+        if (performanceModePreference == null || result == null) {
+            return;
+        }
+        if (result.isAvailable()) {
+            performanceModePreference.setValue(result.mode.preferenceValue);
+            performanceModePreference.setSummary(
+                    getString(performanceModeLabel(result.mode)));
+            return;
+        }
+        performanceModePreference.setSummary(
+                getString(R.string.performance_status_initial_summary));
+    }
+
+    private static int performanceModeLabel(PerformanceMode mode) {
+        switch (mode) {
+            case STOCK_NORMAL:
+                return R.string.performance_mode_normal;
+            case PERFORMANCE:
+                return R.string.performance_mode_performance;
+            case HIGH:
+                return R.string.performance_mode_high;
+            case SYSTEM_MANAGED:
+            default:
+                return R.string.performance_mode_system;
         }
     }
 

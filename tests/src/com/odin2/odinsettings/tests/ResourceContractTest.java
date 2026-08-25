@@ -250,6 +250,7 @@ final class ResourceContractTest {
                 repo.resolve("res/values/arrays.xml"), "string-array");
         baseArrays.remove("controller_profile_values");
         baseArrays.remove("fan_mode_values");
+        baseArrays.remove("performance_mode_values");
         assertEquals(baseArrays,
                 resourceNames(repo.resolve("res/" + locale + "/arrays.xml"), "string-array"),
                 locale + " array resources");

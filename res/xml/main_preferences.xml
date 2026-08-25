@@ -29,6 +29,13 @@
             android:persistent="false"
             android:summary="@string/fan_status_initial_summary"
             android:title="@string/fan_mode_title" />
+        <com.odin2.odinsettings.widget.ControllerListPreference
+            android:entries="@array/performance_mode_entries"
+            android:entryValues="@array/performance_mode_values"
+            android:key="performance_mode"
+            android:persistent="false"
+            android:summary="@string/performance_status_initial_summary"
+            android:title="@string/performance_mode_title" />
         <Preference
             android:enabled="false"
             android:summary="@string/calibration_summary"

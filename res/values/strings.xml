@@ -89,4 +89,10 @@
     <string name="controller_button_dpad_down">D-pad down</string>
     <string name="controller_button_dpad_left">D-pad left</string>
     <string name="controller_button_dpad_right">D-pad right</string>
+    <string name="performance_mode_title">Performance mode</string>
+    <string name="performance_mode_system">System managed</string>
+    <string name="performance_mode_normal">Normal</string>
+    <string name="performance_mode_performance">Performance</string>
+    <string name="performance_mode_high">High</string>
+    <string name="performance_status_initial_summary">Requested: None. Performance status unavailable.</string>
 </resources>

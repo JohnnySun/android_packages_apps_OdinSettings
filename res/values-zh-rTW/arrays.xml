@@ -8,4 +8,10 @@
         <item>@string/fan_mode_quiet</item>
         <item>@string/fan_mode_sport</item>
     </string-array>
+    <string-array name="performance_mode_entries">
+        <item>@string/performance_mode_system</item>
+        <item>@string/performance_mode_normal</item>
+        <item>@string/performance_mode_performance</item>
+        <item>@string/performance_mode_high</item>
+    </string-array>
 </resources>
