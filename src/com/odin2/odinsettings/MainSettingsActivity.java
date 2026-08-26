@@ -582,10 +582,13 @@ public final class MainSettingsActivity extends PreferenceActivity {
         chargeLimitPreference.setValue(
                 ChargeThresholds.of(result.stopPercent, result.resumePercent)
                         .toPreferenceValue());
+        // States the configured pair, not what the charger is doing this second.
+        // The mode row above already reports whether charging is held off, and
+        // borrowing its wording here said "charging to 90%" while charging was
+        // in fact paused at the limit.
         chargeLimitPreference.setSummary(
-                getString(R.string.charge_summary_limit_charging,
-                        result.hasCapacity() ? result.capacityPercent : 0,
-                        result.stopPercent));
+                getString(R.string.charge_limit_current, result.stopPercent,
+                        result.resumePercent));
     }
 
     private void updateFanStatus() {

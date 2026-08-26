@@ -115,4 +115,5 @@
     <string name="charge_limit_85" formatted="false">充到 85%，低於 80% 恢復</string>
     <string name="charge_limit_90" formatted="false">充到 90%，低於 85% 恢復</string>
     <string name="charge_limit_summary">在上方模式設為「保持在上限」時生效。</string>
+    <string name="charge_limit_current" formatted="false">已設為充到 %1$d%%，低於 %2$d%% 恢復。</string>
 </resources>
