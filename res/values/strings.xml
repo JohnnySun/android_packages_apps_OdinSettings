@@ -109,10 +109,10 @@
     <string name="tile_stop_charging">Stop charging</string>
     <string name="tile_stop_charging_unavailable">Unavailable</string>
     <string name="charge_limit_title">Charge limit</string>
-    <string name="charge_limit_60">Stop at 60%, resume below 55%</string>
-    <string name="charge_limit_70">Stop at 70%, resume below 65%</string>
-    <string name="charge_limit_80">Stop at 80%, resume below 75%</string>
-    <string name="charge_limit_85">Stop at 85%, resume below 80%</string>
-    <string name="charge_limit_90">Stop at 90%, resume below 85%</string>
+    <string name="charge_limit_60" formatted="false">Stop at 60%, resume below 55%</string>
+    <string name="charge_limit_70" formatted="false">Stop at 70%, resume below 65%</string>
+    <string name="charge_limit_80" formatted="false">Stop at 80%, resume below 75%</string>
+    <string name="charge_limit_85" formatted="false">Stop at 85%, resume below 80%</string>
+    <string name="charge_limit_90" formatted="false">Stop at 90%, resume below 85%</string>
     <string name="charge_limit_summary">Applies while the mode above is set to hold at the limit.</string>
 </resources>
