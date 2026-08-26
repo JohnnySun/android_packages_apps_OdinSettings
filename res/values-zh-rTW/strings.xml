@@ -108,4 +108,11 @@
     <string name="charge_summary_bypass_charging">電量 %1$d%%，低電量保護已解除限制，正在充電。</string>
     <string name="tile_stop_charging">停止充電</string>
     <string name="tile_stop_charging_unavailable">無法使用</string>
+    <string name="charge_limit_title">充電上限</string>
+    <string name="charge_limit_60">充到 60%，低於 55% 恢復</string>
+    <string name="charge_limit_70">充到 70%，低於 65% 恢復</string>
+    <string name="charge_limit_80">充到 80%，低於 75% 恢復</string>
+    <string name="charge_limit_85">充到 85%，低於 80% 恢復</string>
+    <string name="charge_limit_90">充到 90%，低於 85% 恢復</string>
+    <string name="charge_limit_summary">在上方模式設為「保持在上限」時生效。</string>
 </resources>

@@ -5,4 +5,6 @@ public interface ChargeController {
     ChargeControlResult read();
 
     ChargeControlResult apply(ChargeMode mode);
+
+    ChargeControlResult applyThresholds(ChargeThresholds thresholds);
 }

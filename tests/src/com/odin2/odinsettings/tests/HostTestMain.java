@@ -14,6 +14,7 @@ import com.odin2.odinsettings.hardware.ChargeBypassToggle;
 import com.odin2.odinsettings.hardware.ChargeControlResult;
 import com.odin2.odinsettings.hardware.ChargeMode;
 import com.odin2.odinsettings.hardware.ChargeResponseMapper;
+import com.odin2.odinsettings.hardware.ChargeThresholds;
 import com.odin2.odinsettings.hardware.ControllerProfileDispatcher;
 import com.odin2.odinsettings.hardware.ControllerProfileResponseMapper;
 import com.odin2.odinsettings.hardware.ControllerProfileServiceContract;
@@ -76,6 +77,7 @@ public final class HostTestMain {
         chargeResponseCarriesTheWholeSnapshot();
         chargeFailuresCarryNoSnapshotAtAll();
         chargeBypassToggleRestoresWhatItReplaced();
+        chargeThresholdsRefuseWhatTheDaemonWouldRefuse();
         ResourceContractTest.verify();
         pass();
 
@@ -881,6 +883,49 @@ public final class HostTestMain {
                 ChargeBypassToggle.toggle(null, ChargeMode.OFF);
             }
         }, "A toggle without a confirmed current mode is refused");
+        pass();
+    }
+
+    /**
+     * These bounds are a copy of the daemon's. The point of the copy is that a
+     * pair it would refuse never leaves the screen, so the copy has to agree
+     * with charge_policy.h, and this is where that agreement is written down.
+     */
+    private static void chargeThresholdsRefuseWhatTheDaemonWouldRefuse() {
+        assertEquals(50, ChargeThresholds.MINIMUM_STOP_PERCENT, "minimum stop");
+        assertEquals(99, ChargeThresholds.MAXIMUM_STOP_PERCENT, "maximum stop");
+        assertEquals(2, ChargeThresholds.MINIMUM_HYSTERESIS_PERCENT, "hysteresis band");
+        assertEquals(40, ChargeThresholds.NEVER_RESTRICT_BELOW_PERCENT, "release floor");
+
+        assertTrue(ChargeThresholds.isValid(80, 75), "the default pair is valid");
+        assertTrue(ChargeThresholds.isValid(99, 97), "the widest allowed pair is valid");
+
+        assertFalse(ChargeThresholds.isValid(49, 45), "a stop under the minimum");
+        assertFalse(ChargeThresholds.isValid(100, 95), "a stop over the maximum");
+        assertFalse(ChargeThresholds.isValid(80, 79), "less hysteresis than the band");
+        assertFalse(ChargeThresholds.isValid(80, 39), "a resume under the release floor");
+        assertFalse(ChargeThresholds.isValid(70, 80), "a resume above the stop");
+
+        // Every value the preference offers has to be one the daemon accepts,
+        // or the row would present a choice that cannot be applied.
+        final String[] offered = {"60:55", "70:65", "80:75", "85:80", "90:85"};
+        for (String value : offered) {
+            ChargeThresholds parsed = ChargeThresholds.fromPreferenceValue(value);
+            assertEquals(value, parsed.toPreferenceValue(), "round trips: " + value);
+        }
+
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                ChargeThresholds.fromPreferenceValue("80-75");
+            }
+        }, "a malformed pair is refused");
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                ChargeThresholds.fromPreferenceValue("80:39");
+            }
+        }, "a parseable but invalid pair is refused");
         pass();
     }
 

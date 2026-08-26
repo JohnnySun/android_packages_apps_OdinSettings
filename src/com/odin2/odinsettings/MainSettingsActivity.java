@@ -17,6 +17,7 @@ import com.odin2.odinsettings.hardware.AdapterStatus;
 import com.odin2.odinsettings.hardware.ChargeControlResult;
 import com.odin2.odinsettings.hardware.ChargeController;
 import com.odin2.odinsettings.hardware.ChargeMode;
+import com.odin2.odinsettings.hardware.ChargeThresholds;
 import com.odin2.odinsettings.hardware.AdapterResult;
 import com.odin2.odinsettings.hardware.ControllerProfileDispatcher;
 import com.odin2.odinsettings.hardware.DisabledHardwareAdapter;
@@ -66,6 +67,7 @@ public final class MainSettingsActivity extends PreferenceActivity {
     private PerformanceMode lastRequestedPerformanceMode;
     private final ChargeController chargeController = AidlChargeController.getInstance();
     private ControllerListPreference chargeModePreference;
+    private ControllerListPreference chargeLimitPreference;
     private ChargeMode lastRequestedChargeMode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final DeviceIdentity controllerIdentity = AndroidDeviceIdentity.current();
@@ -139,6 +141,17 @@ public final class MainSettingsActivity extends PreferenceActivity {
                         public boolean onPreferenceChange(Preference preference,
                                 Object newValue) {
                             return applyChargeMode(String.valueOf(newValue));
+                        }
+                    });
+        }
+        chargeLimitPreference = (ControllerListPreference) findPreference("charge_limit");
+        if (chargeLimitPreference != null) {
+            chargeLimitPreference.setOnPreferenceChangeListener(
+                    new Preference.OnPreferenceChangeListener() {
+                        @Override
+                        public boolean onPreferenceChange(Preference preference,
+                                Object newValue) {
+                            return applyChargeLimit(String.valueOf(newValue));
                         }
                     });
         }
@@ -476,6 +489,10 @@ public final class MainSettingsActivity extends PreferenceActivity {
                                 chargeModePreference.setEnabled(true);
                                 renderChargeStatus(result);
                             }
+                            if (!isUiStale() && chargeLimitPreference != null) {
+                                chargeLimitPreference.setEnabled(true);
+                                renderChargeLimit(result);
+                            }
                         }
                     });
                 }
@@ -529,6 +546,46 @@ public final class MainSettingsActivity extends PreferenceActivity {
             default:
                 return getString(R.string.charge_summary_off, result.capacityPercent);
         }
+    }
+
+    private boolean applyChargeLimit(String preferenceValue) {
+        if (chargeLimitPreference == null) {
+            return false;
+        }
+        final ChargeThresholds requested;
+        try {
+            requested = ChargeThresholds.fromPreferenceValue(preferenceValue);
+        } catch (IllegalArgumentException rejected) {
+            // A pair the daemon would refuse never leaves this screen.
+            return false;
+        }
+        chargeLimitPreference.setEnabled(false);
+        submitCharge(new ChargeWork() {
+            @Override
+            public ChargeControlResult run() {
+                return chargeController.applyThresholds(requested);
+            }
+        });
+        // Both rows re-render from what the daemon reports, so a refused pair
+        // leaves neither of them claiming it was applied.
+        return false;
+    }
+
+    private void renderChargeLimit(ChargeControlResult result) {
+        if (chargeLimitPreference == null || result == null) {
+            return;
+        }
+        if (!result.isAvailable() || !result.hasThresholds()) {
+            chargeLimitPreference.setSummary(getString(R.string.charge_limit_summary));
+            return;
+        }
+        chargeLimitPreference.setValue(
+                ChargeThresholds.of(result.stopPercent, result.resumePercent)
+                        .toPreferenceValue());
+        chargeLimitPreference.setSummary(
+                getString(R.string.charge_summary_limit_charging,
+                        result.hasCapacity() ? result.capacityPercent : 0,
+                        result.stopPercent));
     }
 
     private void updateFanStatus() {

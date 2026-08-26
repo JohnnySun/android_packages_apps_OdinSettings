@@ -19,4 +19,11 @@
         <item>@string/charge_mode_limit</item>
         <item>@string/charge_mode_bypass</item>
     </string-array>
+    <string-array name="charge_limit_entries">
+        <item>@string/charge_limit_60</item>
+        <item>@string/charge_limit_70</item>
+        <item>@string/charge_limit_80</item>
+        <item>@string/charge_limit_85</item>
+        <item>@string/charge_limit_90</item>
+    </string-array>
 </resources>

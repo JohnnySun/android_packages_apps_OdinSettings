@@ -29,6 +29,13 @@
             android:persistent="false"
             android:summary="@string/charge_status_initial_summary"
             android:title="@string/charge_mode_title" />
+        <com.odin2.odinsettings.widget.ControllerListPreference
+            android:entries="@array/charge_limit_entries"
+            android:entryValues="@array/charge_limit_values"
+            android:key="charge_limit"
+            android:persistent="false"
+            android:summary="@string/charge_limit_summary"
+            android:title="@string/charge_limit_title" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/hardware_controls_category">

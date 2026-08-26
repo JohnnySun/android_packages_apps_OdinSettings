@@ -10,6 +10,7 @@ import com.odin2.odinsettings.hardware.ChargeControlResult;
 import com.odin2.odinsettings.hardware.ChargeController;
 import com.odin2.odinsettings.hardware.ChargeMode;
 import com.odin2.odinsettings.hardware.ChargeResponseMapper;
+import com.odin2.odinsettings.hardware.ChargeThresholds;
 import com.odin2.odinsettings.hardware.ChargeServiceConnection;
 
 /** Talks to the private charge daemon over its own Binder instance. */
@@ -52,6 +53,25 @@ public final class AidlChargeController implements ChargeController {
                     return translate(service.setMode(mode.serviceValue), mode, "setMode");
                 } catch (RemoteException exception) {
                     throw remoteFailure("setMode outcome is unknown", exception);
+                }
+            }
+        });
+    }
+
+    @Override
+    public ChargeControlResult applyThresholds(final ChargeThresholds thresholds) {
+        if (thresholds == null) {
+            throw new IllegalArgumentException("Thresholds are required");
+        }
+        return connection.write(new ChargeServiceConnection.Call<IOdinCharge>() {
+            @Override
+            public ChargeControlResult call(IOdinCharge service)
+                    throws ChargeServiceConnection.RemoteFailure {
+                try {
+                    return translate(service.setThresholds(thresholds.stopPercent,
+                            thresholds.resumePercent), null, "setThresholds");
+                } catch (RemoteException exception) {
+                    throw remoteFailure("setThresholds outcome is unknown", exception);
                 }
             }
         });
